@@ -7,7 +7,7 @@ import numpy as np
 from pathlib import Path
 from datetime import datetime, timedelta
 
-st.set_page_config(page_title="Banff Traffic Insights & Visit Planner", layout="wide")
+st.set_page_config(page_title="Plan Your Banff Visit: AI-Powered Traffic Insights", layout="wide")
 
 DATA_DIR = Path(__file__).resolve().parent
 HISTORICAL_PATH = DATA_DIR / "TW Traffic _data.csv"
@@ -446,7 +446,7 @@ def render_monthly_trends(historical: pd.DataFrame) -> None:
 
 def main() -> None:
     # Header
-    st.title("🏔️ Banff Traffic Insights & Visit Planner")
+    st.title("🏔️ Plan Your Banff Visit: AI-Powered Traffic Insights")
     st.markdown("*Analyze historical traffic patterns and find the best days to visit Banff with lower congestion*")
     st.markdown("---")
     
