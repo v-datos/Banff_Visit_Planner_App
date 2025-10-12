@@ -429,32 +429,17 @@ def main() -> None:
     with st.sidebar:
         st.header("⚙️ Controls")
         st.markdown("---")
-        
-        # Date range filter for forecast
+
+        # Display forecast date range (static)
         if not forecast_df.empty:
             st.subheader("Forecast Range")
-            default_range = (forecast_df["ds"].min().date(), forecast_df["ds"].max().date())
-            selected_range = st.date_input(
-                "Select forecast dates",
-                value=default_range,
-                min_value=default_range[0],
-                max_value=default_range[1],
-            )
-            if isinstance(selected_range, tuple):
-                start_date, end_date = selected_range
-            else:
-                start_date, end_date = default_range[0], selected_range
-            if start_date > end_date:
-                start_date, end_date = end_date, start_date
-            filtered_forecast = forecast_df[
-                (forecast_df["ds"].dt.date >= start_date) & 
-                (forecast_df["ds"].dt.date <= end_date)
-            ]
-        else:
-            filtered_forecast = forecast_df
-        
-        st.metric("Forecast Days", len(filtered_forecast))
-        st.markdown("---")
+            start_date = forecast_df["ds"].min().date()
+            end_date = forecast_df["ds"].max().date()
+            st.write(f"**{start_date.strftime('%b %d, %Y')}** to **{end_date.strftime('%b %d, %Y')}**")
+            st.metric("Forecast Days", len(forecast_df))
+            st.markdown("---")
+
+        filtered_forecast = forecast_df
 
         st.caption("💡 **Tip:** Lower traffic scores indicate better times to visit!")
 
