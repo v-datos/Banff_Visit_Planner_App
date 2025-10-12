@@ -105,81 +105,48 @@ def get_traffic_category(volume: float) -> tuple:
 
 def render_kpi_cards(historical: pd.DataFrame, forecast: pd.DataFrame) -> None:
     """Render KPI cards at the top of the dashboard"""
-    st.markdown("### 📊 Key Metrics")
-    
-    # Calculate metrics
-    hist_avg = historical["Vehicles Per Day"].mean()
-    hist_max = historical["Vehicles Per Day"].max()
-    hist_min = historical["Vehicles Per Day"].min()
-    
-    # Day of week analysis
-    dow_avg = historical.groupby("Day of Week")["Vehicles Per Day"].mean()
-    best_day = dow_avg.idxmin()
-    worst_day = dow_avg.idxmax()
-    
     # Current month trend (last 30 days vs previous 30)
     last_30 = historical.tail(30)["Vehicles Per Day"].mean()
     prev_30 = historical.iloc[-60:-30]["Vehicles Per Day"].mean()
     trend_pct = ((last_30 - prev_30) / prev_30 * 100) if prev_30 > 0 else 0
-    
+
     # Forecast peak
     if not forecast.empty:
         fcst_peak = forecast.loc[forecast["Ensemble"].idxmax()]
         fcst_low = forecast.loc[forecast["Ensemble"].idxmin()]
-    
-    # Display KPIs in columns
-    col1, col2, col3 = st.columns(3)
 
-    with col1:
-        st.metric(
-            "Best Day to Visit",
-            best_day,
-            f"{int(dow_avg[best_day]):,} avg vehicles",
-            help="Day of week with lowest average traffic"
-        )
-
-    with col2:
-        st.metric(
-            "Avoid This Day",
-            worst_day,
-            f"{int(dow_avg[worst_day]):,} avg vehicles",
-            delta_color="inverse",
-            help="Day of week with highest average traffic"
-        )
-
-    with col3:
-        st.metric(
-            "Recent Trend (30 days)",
-            f"{trend_pct:+.1f}%",
-            "vs previous 30 days",
-            delta_color="inverse"
-        )
-    
     if not forecast.empty:
-        st.markdown("---")
         st.markdown("### 🔮 Forecast Highlights")
-        col1, col2, col3 = st.columns(3)
-        
+        col1, col2, col3, col4 = st.columns(4)
+
         with col1:
             st.metric(
                 "Forecast Peak Day",
                 fcst_peak["ds"].strftime("%b %d, %Y"),
                 f"{int(fcst_peak['Ensemble']):,} vehicles"
             )
-        
+
         with col2:
             st.metric(
                 "Best Forecast Day",
                 fcst_low["ds"].strftime("%b %d, %Y"),
                 f"{int(fcst_low['Ensemble']):,} vehicles"
             )
-        
+
         with col3:
             days_over_25k = (forecast["Ensemble"] > 25000).sum()
             st.metric(
                 "High Traffic Days",
                 f"{days_over_25k}/{len(forecast)}",
                 "days > 25K vehicles"
+            )
+
+        with col4:
+            st.metric(
+                "Recent Trend (30 days)",
+                f"{trend_pct:+.1f}%",
+                "vs previous 30 days",
+                delta_color="inverse"
             )
 
 
@@ -488,16 +455,7 @@ def main() -> None:
         
         st.metric("Forecast Days", len(filtered_forecast))
         st.markdown("---")
-        
-        # Historical data info
-        st.subheader("📊 Data Info")
-        st.metric("Historical Records", f"{len(historical_df):,}")
-        st.metric("Date Range", 
-                 f"{historical_df['Date'].min().strftime('%Y-%m-%d')}")
-        st.metric("to", 
-                 f"{historical_df['Date'].max().strftime('%Y-%m-%d')}")
-        
-        st.markdown("---")
+
         st.caption("💡 **Tip:** Lower traffic scores indicate better times to visit!")
 
         st.markdown("---")
