@@ -451,22 +451,23 @@ def main() -> None:
     # Main content
     render_kpi_cards(historical_df, filtered_forecast)
     st.markdown("---")
-    
+
+    render_visit_planner(filtered_forecast, historical_df)
+    st.markdown("---")
+
     render_main_chart(historical_df, filtered_forecast)
     st.markdown("---")
-    
+
     # Two columns for analysis
     col1, col2 = st.columns(2)
-    
+
     with col1:
         render_day_of_week_analysis(historical_df)
-    
+
     with col2:
         render_monthly_trends(historical_df)
-    
+
     st.markdown("---")
-    
-    render_visit_planner(filtered_forecast, historical_df)
     
     # Detailed forecast table
     with st.expander("📋 View Detailed Forecast Data"):
