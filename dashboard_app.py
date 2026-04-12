@@ -14,13 +14,13 @@ HISTORICAL_PATH = DATA_DIR / "TW Traffic _data.csv"
 FORECAST_PATH = DATA_DIR / "predictions.csv"
 
 
-@st.cache_data(show_spinner=False)
 def load_csv(path: Path, **read_kwargs) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"{path.name} not found in {path.parent}")
     return pd.read_csv(path, **read_kwargs)
 
 
+@st.cache_data(show_spinner=False)
 def prepare_historical() -> pd.DataFrame:
     """Load and prepare historical traffic data"""
     df = load_csv(HISTORICAL_PATH, encoding="utf-16", sep="\t")
@@ -33,6 +33,7 @@ def prepare_historical() -> pd.DataFrame:
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
     df["Vehicles Per Day"] = pd.to_numeric(df["Vehicles Per Day"], errors="coerce")
     df = df.dropna(subset=["Date", "Vehicles Per Day"])
+    # Remove the final row because the source data (Tableau export) includes an aggregate/footer row
     df = df[:-1]
     df = df.sort_values("Date")
     df = df[~df["Date"].duplicated(keep="first")]
@@ -49,6 +50,7 @@ def prepare_historical() -> pd.DataFrame:
     return df
 
 
+@st.cache_data(show_spinner=False)
 def prepare_forecast() -> pd.DataFrame:
     """Load and prepare forecast data"""
     df = load_csv(FORECAST_PATH)
@@ -94,13 +96,13 @@ def calculate_traffic_score(volume: float, avg_volume: float, std_volume: float)
 def get_traffic_category(volume: float) -> tuple:
     """Return traffic category and color"""
     if volume < 20000:
-        return "Light", "#2ecc71"  # Green
+        return "Light", "green"
     elif volume < 25000:
-        return "Moderate", "#f39c12"  # Orange
+        return "Moderate", "orange"
     elif volume < 30000:
-        return "Heavy", "#e74c3c"  # Red
+        return "Heavy", "red"
     else:
-        return "Very Heavy", "#8b0000"  # Dark Red
+        return "Very Heavy", "red"  # Fallback to red for standard markdown support
 
 
 def render_kpi_cards(historical: pd.DataFrame, forecast: pd.DataFrame) -> None:
@@ -115,7 +117,6 @@ def render_kpi_cards(historical: pd.DataFrame, forecast: pd.DataFrame) -> None:
         fcst_peak = forecast.loc[forecast["Ensemble"].idxmax()]
         fcst_low = forecast.loc[forecast["Ensemble"].idxmin()]
 
-    if not forecast.empty:
         st.markdown("### 🔮 Forecast Highlights")
         col1, col2, col3, col4 = st.columns(4)
 
@@ -154,8 +155,12 @@ def render_main_chart(historical: pd.DataFrame, forecast: pd.DataFrame) -> None:
     """Render main time series chart with historical and forecast"""
     st.markdown("### 📈 Traffic Trends & Forecast")
     
-    # Get last 90 days of historical data
-    history_tail = historical[historical["Date"] >= forecast["ds"].min() - pd.Timedelta(days=90)]
+    if forecast.empty:
+        st.warning("Forecast data is empty. Displaying historical data only.")
+        history_tail = historical.tail(90)
+    else:
+        # Get last 90 days of historical data leading up to the forecast
+        history_tail = historical[historical["Date"] >= forecast["ds"].min() - pd.Timedelta(days=90)]
     
     fig = go.Figure()
     
@@ -285,6 +290,18 @@ def render_visit_planner(forecast: pd.DataFrame, historical: pd.DataFrame) -> No
     # Get best and worst days by score
     forecast_sorted_by_score = forecast_scored.sort_values("Traffic Score", ascending=False)
 
+    def render_day_row(row, is_top=True):
+        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+        with col1:
+            st.markdown(f"**{row['ds'].strftime('%A, %B %d')}**")
+        with col2:
+            st.markdown(f"Traffic: :{row['Color']}[**{row['Category']}**]")
+        with col3:
+            st.markdown(f"{int(row['Ensemble']):,} vehicles")
+        with col4:
+            score_color = "green" if row["Traffic Score"] >= 70 else "orange" if row["Traffic Score"] >= 50 else "red"
+            st.markdown(f":{score_color}[**Score: {row['Traffic Score']:.0f}**]")
+
     # Display top recommendations
     st.markdown("#### 🌟 Top 5 Recommended Days to Visit")
 
@@ -292,20 +309,7 @@ def render_visit_planner(forecast: pd.DataFrame, historical: pd.DataFrame) -> No
     top_5 = forecast_sorted_by_score.head(5).sort_values("ds")
 
     for idx, row in top_5.iterrows():
-        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-
-        with col1:
-            st.markdown(f"**{row['ds'].strftime('%A, %B %d')}**")
-
-        with col2:
-            st.markdown(f"Traffic: :green[**{row['Category']}**]")
-
-        with col3:
-            st.markdown(f"{int(row['Ensemble']):,} vehicles")
-
-        with col4:
-            score_color = "green" if row["Traffic Score"] >= 70 else "orange" if row["Traffic Score"] >= 50 else "red"
-            st.markdown(f":{score_color}[**Score: {row['Traffic Score']:.0f}**]")
+        render_day_row(row, is_top=True)
 
     st.markdown("---")
 
@@ -316,19 +320,7 @@ def render_visit_planner(forecast: pd.DataFrame, historical: pd.DataFrame) -> No
     bottom_5 = forecast_sorted_by_score.tail(5).sort_values("ds")
     
     for idx, row in bottom_5.iterrows():
-        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-        
-        with col1:
-            st.markdown(f"**{row['ds'].strftime('%A, %B %d')}**")
-        
-        with col2:
-            st.markdown(f"Traffic: :red[**{row['Category']}**]")
-        
-        with col3:
-            st.markdown(f"{int(row['Ensemble']):,} vehicles")
-        
-        with col4:
-            st.markdown(f":red[**Score: {row['Traffic Score']:.0f}**]")
+        render_day_row(row, is_top=False)
     
     st.markdown("---")
 

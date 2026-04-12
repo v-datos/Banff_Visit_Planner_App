@@ -47,3 +47,5 @@ Thumbs.db
 # Data (if you don't want to commit data files)
 # *.csv
 # *.xlsx
+lightning_logs/
+modelos_exo/
