@@ -1,10 +1,12 @@
 import os
 import pandas as pd
 import numpy as np
+from pathlib import Path
 from utilsforecast.feature_engineering import fourier, trend, pipeline, partial
 from neuralforecast import NeuralForecast
 from neuralforecast.models import NBEATSx, NHITS
 import logging
+from data_utils import load_csv, normalize_historical_traffic
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -34,22 +36,18 @@ def main():
     # Load latest traffic data up to the last available date
     data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'TW Traffic _data.csv')
     logger.info(f"Loading data from {data_path}")
-    
-    traffic_df = pd.read_csv(data_path, encoding='utf-16', sep='\t')
-    
-    # Rename columns to standard names used by the dashboard and previous script
-    traffic_df.rename(columns={'Day of Time Stamp': 'Date', 'Combined TW': 'Vehicles Per Day'}, inplace=True)
-    
-    # Drop the 'Grand Total' dummy row if it exists (usually the last row)
-    traffic_df = traffic_df[traffic_df['Date'] != 'Grand Total']
-    
-    # Change 'Date' to datetime
-    traffic_df['Date'] = pd.to_datetime(traffic_df['Date'], errors='coerce')
-    
+
+    traffic_df = load_csv(Path(data_path), encoding='utf-16', sep='\t')
+    traffic_df = normalize_historical_traffic(traffic_df)
+    logger.info(
+        "Normalized historical data: %s rows from %s to %s",
+        len(traffic_df),
+        traffic_df['Date'].min(),
+        traffic_df['Date'].max(),
+    )
+
     # Create Vehicles per Day dataset
     vpd_df = traffic_df[['Date', 'Vehicles Per Day']].copy()
-    vpd_df['Vehicles Per Day'] = pd.to_numeric(vpd_df['Vehicles Per Day'], errors='coerce')
-    vpd_df = vpd_df.dropna(subset=['Date', 'Vehicles Per Day'])
 
     # Prepare data for model
     ml_df = prepare_data_for_model(vpd_df)
@@ -100,6 +98,22 @@ def main():
     # Select best results and Ensemble
     model_names = [col for col in df_pred.columns if col not in ['unique_id', 'ds']]
     df_pred['Ensemble'] = df_pred[model_names].mean(axis=1)
+
+    recent_history = vpd_df['Vehicles Per Day'].tail(30)
+    recent_median = recent_history.median()
+    recent_min = recent_history.min()
+    recent_max = recent_history.max()
+
+    if df_pred['Ensemble'].isna().any():
+        raise ValueError("Forecast contains NaN values")
+
+    if (df_pred['Ensemble'] < recent_median * 0.5).all():
+        raise ValueError(
+            "Forecast is implausibly low: "
+            f"median={df_pred['Ensemble'].median():.0f}, "
+            f"recent history median={recent_median:.0f}, "
+            f"range=({recent_min:.0f}, {recent_max:.0f})"
+        )
 
     output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'predictions.csv')
     df_pred.to_csv(output_path, index=False)

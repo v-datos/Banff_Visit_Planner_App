@@ -1,14 +1,14 @@
 # Banff Traffic Insights & Visit Planner
 
-An interactive Streamlit dashboard that analyzes historical traffic patterns and provides AI-powered forecasts to help visitors find the best days to visit Banff with lower congestion.
+An interactive Streamlit app that helps tourists decide when to visit Banff with lower expected traffic, using historical data and AI-generated forecasts.
 
 ## Features
 
-- **Traffic Trends & Forecasts**: Interactive charts showing historical and predicted vehicle traffic
-- **Visit Planner**: AI-powered recommendations for the best days to visit based on traffic scores
+- **Decision-First Visit Planner**: Highlights the best day to visit and the busiest day to avoid
+- **Traffic Forecasts**: Shows the upcoming 15-day traffic outlook
+- **Planning Picks**: Surfaces top recommended days and days to avoid
 - **Day of Week Analysis**: Compare average traffic by day of week
 - **Monthly Patterns**: Visualize seasonal trends across multiple years
-- **Traffic Scoring System**: Easy-to-understand 0-100 scoring system for each day
 - **Automated Data Updates**: Built-in data extraction script and GitHub Actions workflow to keep historical traffic data and AI forecasts up-to-date
 
 ## Data Source
@@ -21,15 +21,15 @@ Combined two-way traffic data from the Town of Banff, Alberta (July 2013 - Prese
 The historical dataset (`TW Traffic _data.csv`) and forecast data (`predictions.csv`) are kept up-to-date automatically:
 - A Python script (`extract_data.py`) fetches the latest `.twb` workbook from Tableau Public, extracts the underlying `.hyper` database, and aggregates the daily traffic counts.
 - Another script (`update_predictions.py`) runs the pretrained neural forecasting models to dynamically generate the next 15 days of predictions based on the latest available data.
-- A GitHub Actions workflow (`.github/workflows/update_data.yml`) runs these scripts on the 1st and 16th of every month.
+- A GitHub Actions workflow (`.github/workflows/update_data.yml`) checks daily and only runs the update pipeline every 15 days starting from April 15, 2026.
 - The workflow automatically commits and pushes the updated CSVs back to the repository.
 
-## Traffic Score Guide
+## Visit Signals
 
-- 🟢 **70-100 Excellent** - Significantly below average traffic
-- 🟡 **50-69 Good** - Below to average traffic
-- 🟠 **30-49 Fair** - Above average traffic
-- 🔴 **0-29 Poor** - Significantly above average traffic
+- 🟢 **Best day to visit** - Lowest expected traffic in the current forecast window
+- 🟩 **Good day to visit** - Lower-than-usual traffic
+- 🟡 **Busy day** - Higher traffic, but still workable
+- 🔴 **Avoid if possible** - Highest expected traffic
 
 ## Installation
 
@@ -39,19 +39,24 @@ git clone <your-repository-url>
 cd visit_planner_app
 ```
 
-2. Install required dependencies:
+2. Activate the virtual environment:
+```bash
+source .venv/bin/activate
+```
+
+3. Install required dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Ensure you have the required data files:
+4. Ensure you have the required data files:
    - `TW Traffic _data.csv` - Historical traffic data (updated automatically via GitHub Actions, or manually via `python extract_data.py`)
    - `predictions.csv` - Forecast data (updated automatically via GitHub Actions, or manually via `python update_predictions.py`)
 
 ## Running the App
 
 ```bash
-streamlit run dashboard_app.py
+streamlit run traffic_app.py
 ```
 
 The app will open in your default web browser at `http://localhost:8501`
@@ -69,14 +74,16 @@ This app can be deployed on:
 1. Push your code to GitHub
 2. Go to [share.streamlit.io](https://share.streamlit.io)
 3. Connect your GitHub repository
-4. Deploy!
+4. Set the main file path to `traffic_app.py`
+5. Deploy!
 
 ## Project Structure
 
 ```
 Visit_Planner_App/
 ├── .github/workflows/       # GitHub Actions for automated data updates
-├── dashboard_app.py         # Main Streamlit application
+├── traffic_app.py           # Main Streamlit application
+├── data_utils.py            # Shared data loading and normalization helpers
 ├── extract_data.py          # Script to download and process Tableau data
 ├── update_predictions.py    # Script to dynamically generate AI traffic forecasts
 ├── modelos_exo/             # Pretrained neural forecast models
