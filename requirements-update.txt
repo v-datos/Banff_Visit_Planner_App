@@ -1,0 +1,4 @@
+requests>=2.31.0
+pantab>=5.3.0
+neuralforecast>=1.7.0
+utilsforecast>=0.0.24
