@@ -633,7 +633,7 @@ def render_forecast_chart(historical: pd.DataFrame, forecast: pd.DataFrame, summ
     )
     fig.update_xaxes(showgrid=False, zeroline=False)
     fig.update_yaxes(gridcolor="rgba(148,163,184,0.12)", zeroline=False)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def render_pick_pills(days: pd.DataFrame, historical: pd.DataFrame, title: str, mode: str) -> None:
@@ -706,7 +706,7 @@ def render_day_of_week_patterns(historical: pd.DataFrame) -> None:
         font=dict(color=COLORS["text"]),
     )
     fig.update_yaxes(gridcolor="rgba(148,163,184,0.12)")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def render_monthly_patterns(historical: pd.DataFrame) -> None:
@@ -744,14 +744,14 @@ def render_monthly_patterns(historical: pd.DataFrame) -> None:
         font=dict(color=COLORS["text"]),
     )
     fig.update_yaxes(gridcolor="rgba(148,163,184,0.12)")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def render_forecast_table(forecast: pd.DataFrame, historical: pd.DataFrame) -> None:
     table = forecast[["ds", "Day of Week", "Ensemble"]].copy()
     table.columns = ["Date", "Day", "Forecasted Vehicles"]
     table["Visit signal"] = table["Forecasted Vehicles"].apply(lambda v: label_for_volume(v, historical)[0])
-    st.dataframe(table, hide_index=True, use_container_width=True)
+    st.dataframe(table, hide_index=True, width="stretch")
 
 
 def main() -> None:
