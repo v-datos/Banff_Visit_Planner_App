@@ -27,7 +27,7 @@ Combined two-way traffic data from the Town of Banff, Alberta (July 2013 - Prese
 1. Clone this repository:
 ```bash
 git clone <your-repository-url>
-cd Visit_Planner_App
+cd visit_planner_app
 ```
 
 2. Install required dependencies:
