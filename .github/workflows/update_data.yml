@@ -22,6 +22,13 @@ jobs:
         run: |
           anchor="2026-04-15"
           today="$(date -u +%F)"
+
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "Proceeding: manual workflow dispatch bypasses the 15-day cadence gate."
+            exit 0
+          fi
+
           anchor_ts="$(date -u -d "$anchor" +%s)"
           today_ts="$(date -u -d "$today" +%s)"
           days_since_anchor=$(( (today_ts - anchor_ts) / 86400 ))
