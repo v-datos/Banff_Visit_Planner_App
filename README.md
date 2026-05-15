@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="visit_planner.png" alt="Banff Visit Planner Header" width="800">
+</p>
+
+
 # Banff Visit Planner
 
 [Open the live app](https://banff-visit-planner-app.streamlit.app/)
