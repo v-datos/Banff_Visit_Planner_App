@@ -41,7 +41,7 @@ This repository includes an automated update pipeline.
 - The updated files are committed back to GitHub
 - Streamlit Community Cloud redeploys from the repo, which keeps the live app current
 
-The update workflow is set to run every 15 days starting on April 15, 2026.
+The update workflow is set to run on the 1st and 16th of each month.
 
 ## Who this is for
 

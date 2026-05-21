@@ -15,10 +15,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.13'
           cache: 'pip'
@@ -28,6 +28,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-update.txt
+
+      - name: Download pretrained model bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODEL_RELEASE_TAG: modelos-exo-v1
+          MODEL_ASSET_NAME: modelos_exo.zip
+        run: |
+          rm -rf modelos_exo modelos_exo.zip
+          gh release download "$MODEL_RELEASE_TAG" --pattern "$MODEL_ASSET_NAME" --repo "$GITHUB_REPOSITORY"
+          unzip -q "$MODEL_ASSET_NAME"
+          test -d modelos_exo
 
       - name: Run data extraction script
         run: python extract_data.py

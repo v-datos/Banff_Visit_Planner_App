@@ -21,7 +21,8 @@ Combined two-way traffic data from the Town of Banff, Alberta (July 2013 - Prese
 The historical dataset (`TW Traffic _data.csv`) and forecast data (`predictions.csv`) are kept up-to-date automatically:
 - A Python script (`extract_data.py`) fetches the latest `.twb` workbook from Tableau Public, extracts the underlying `.hyper` database, and aggregates the daily traffic counts.
 - Another script (`update_predictions.py`) runs the pretrained neural forecasting models to dynamically generate the next 15 days of predictions based on the latest available data.
-- A GitHub Actions workflow (`.github/workflows/update_data.yml`) checks daily and only runs the update pipeline every 15 days starting from April 15, 2026.
+- A GitHub Actions workflow (`.github/workflows/update_data.yml`) runs on the 1st and 16th of each month.
+- The workflow downloads the pretrained `modelos_exo` bundle from a GitHub Release before generating forecasts.
 - The workflow automatically commits and pushes the updated CSVs back to the repository.
 
 ## Visit Signals
