@@ -47,38 +47,6 @@ def prepare_data_for_model(vpd_df, date_col='Date', target_col='Vehicles Per Day
     return ml_df
 
 
-def build_baseline_forecast(vpd_df: pd.DataFrame, horizon: int) -> pd.DataFrame:
-    logger.warning("Using baseline forecast because pretrained model artifacts are unavailable.")
-
-    history = vpd_df.sort_values("Date").copy()
-    history["weekday"] = history["Date"].dt.dayofweek
-
-    last_date = history["Date"].max()
-    future_dates = pd.date_range(last_date + pd.Timedelta(days=1), periods=horizon, freq="D")
-
-    recent_14 = history["Vehicles Per Day"].tail(14).mean()
-    recent_28 = history["Vehicles Per Day"].tail(28).mean()
-    prior_14 = history["Vehicles Per Day"].iloc[-28:-14].mean() if len(history) >= 28 else recent_14
-
-    trend_ratio = 1.0
-    if pd.notna(prior_14) and prior_14 > 0:
-        trend_ratio = recent_14 / prior_14
-    trend_ratio = float(np.clip(trend_ratio, 0.90, 1.10))
-
-    predictions = []
-    for ds in future_dates:
-        same_weekday = history.loc[history["weekday"] == ds.dayofweek, "Vehicles Per Day"].tail(8)
-        weekday_mean = same_weekday.mean() if not same_weekday.empty else recent_14
-        base = (0.60 * weekday_mean) + (0.25 * recent_14) + (0.15 * recent_28)
-        predictions.append(max(base * trend_ratio, 0))
-
-    return pd.DataFrame({
-        "unique_id": "traffic",
-        "ds": future_dates,
-        "Ensemble": np.round(predictions, 3),
-    })
-
-
 def generate_model_forecast(vpd_df: pd.DataFrame, horizon: int) -> pd.DataFrame:
     from utilsforecast.feature_engineering import fourier, trend, pipeline, partial
     from neuralforecast import NeuralForecast
@@ -141,20 +109,12 @@ def main():
 
     horizon = 15
     model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'modelos_exo')
-    force_baseline = os.environ.get("BANFF_FORCE_BASELINE_FORECAST") == "1"
+    if not os.path.isdir(model_dir):
+        raise FileNotFoundError(
+            f"Required pretrained model directory not found: {model_dir}"
+        )
 
-    if force_baseline:
-        logger.warning("BANFF_FORCE_BASELINE_FORECAST=1, skipping pretrained model usage.")
-        df_pred = build_baseline_forecast(vpd_df, horizon)
-    elif os.path.isdir(model_dir):
-        try:
-            df_pred = generate_model_forecast(vpd_df, horizon)
-        except Exception:
-            logger.exception("Pretrained forecast generation failed; falling back to baseline forecast.")
-            df_pred = build_baseline_forecast(vpd_df, horizon)
-    else:
-        logger.warning("Model directory not found at %s; falling back to baseline forecast.", model_dir)
-        df_pred = build_baseline_forecast(vpd_df, horizon)
+    df_pred = generate_model_forecast(vpd_df, horizon)
 
     recent_history = vpd_df['Vehicles Per Day'].tail(30)
     recent_median = recent_history.median()
