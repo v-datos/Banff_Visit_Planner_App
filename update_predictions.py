@@ -1,4 +1,5 @@
 import os
+import importlib.metadata as metadata
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -10,6 +11,22 @@ from data_utils import load_csv, normalize_historical_traffic
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def log_runtime_versions() -> None:
+    for package in [
+        "python",
+        "pandas",
+        "torch",
+        "pytorch-lightning",
+        "neuralforecast",
+        "utilsforecast",
+    ]:
+        if package == "python":
+            version = os.sys.version.replace("\n", " ")
+        else:
+            version = metadata.version(package)
+        logger.info("%s version: %s", package, version)
 
 def prepare_data_for_model(vpd_df, date_col='Date', target_col='Vehicles Per Day'):
     """Prepare data in MLForecast format with comprehensive exploration"""
@@ -33,6 +50,8 @@ def prepare_data_for_model(vpd_df, date_col='Date', target_col='Vehicles Per Day
     return ml_df
 
 def main():
+    log_runtime_versions()
+
     # Load latest traffic data up to the last available date
     data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'TW Traffic _data.csv')
     logger.info(f"Loading data from {data_path}")
@@ -85,11 +104,9 @@ def main():
     df_train_exo_fut['month'] = df_train_exo_fut['ds'].dt.month
     df_train_exo_fut['year'] = df_train_exo_fut['ds'].dt.year
 
-    exo_variables = [col for col in df_train_exo.columns if col not in ['unique_id', 'ds', 'y']]
-
     logger.info("Loading pretrained models...")
     model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'modelos_exo')
-    nf_nbeatsx = NeuralForecast.load(path=model_dir)
+    nf_nbeatsx = NeuralForecast.load(path=model_dir, map_location="cpu")
 
     logger.info("Generating predictions...")
     # Forecast next 15 days

@@ -2,8 +2,8 @@ name: Update Traffic Data
 
 on:
   schedule:
-    # Runs daily; a guard below only proceeds every 15 days starting from 2026-04-15
-    - cron: '0 6 * * *'
+    # Runs twice a month on fixed dates: the 1st and the 16th
+    - cron: '0 6 1,16 * *'
   workflow_dispatch: # Allows manual trigger
 
 permissions:
@@ -17,57 +17,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Check 15-day update cadence
-        id: cadence
-        run: |
-          anchor="2026-04-15"
-          today="$(date -u +%F)"
-
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            echo "Proceeding: manual workflow dispatch bypasses the 15-day cadence gate."
-            exit 0
-          fi
-
-          anchor_ts="$(date -u -d "$anchor" +%s)"
-          today_ts="$(date -u -d "$today" +%s)"
-          days_since_anchor=$(( (today_ts - anchor_ts) / 86400 ))
-
-          if [ "$days_since_anchor" -lt 0 ]; then
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping: current date $today is before anchor date $anchor."
-          elif [ $((days_since_anchor % 15)) -eq 0 ]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            echo "Proceeding: $today is $days_since_anchor days since $anchor."
-          else
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping: $today is $days_since_anchor days since $anchor, not on the 15-day cadence."
-          fi
-
       - name: Set up Python
-        if: steps.cadence.outputs.should_run == 'true'
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.13'
           cache: 'pip'
 
       - name: Install dependencies
-        if: steps.cadence.outputs.should_run == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-update.txt
 
       - name: Run data extraction script
-        if: steps.cadence.outputs.should_run == 'true'
         run: python extract_data.py
 
       - name: Run prediction updates
-        if: steps.cadence.outputs.should_run == 'true'
         run: python update_predictions.py
 
       - name: Commit and push changes
-        if: steps.cadence.outputs.should_run == 'true'
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
