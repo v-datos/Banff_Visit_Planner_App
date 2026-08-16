@@ -16,6 +16,11 @@ DATA_DIR = Path(__file__).resolve().parent
 HISTORICAL_PATH = DATA_DIR / "TW Traffic _data.csv"
 FORECAST_PATH = DATA_DIR / "predictions.csv"
 
+# Days either side of the same calendar date used to build the seasonal baseline.
+SEASONAL_WINDOW_DAYS = 10
+# Traffic has grown ~10% over the full record, so only recent years form the baseline.
+SEASONAL_BASELINE_YEARS = 3
+
 COLORS = {
     "bg": "#0F172A",
     "card": "#111827",
@@ -307,7 +312,7 @@ def prepare_historical() -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
-def prepare_forecast() -> pd.DataFrame:
+def prepare_forecast(today: pd.Timestamp) -> pd.DataFrame:
     df = load_csv(FORECAST_PATH)
     df.columns = [col.strip() for col in df.columns]
     required_cols = {"ds", "Ensemble"}
@@ -317,6 +322,7 @@ def prepare_forecast() -> pd.DataFrame:
     df["ds"] = pd.to_datetime(df["ds"], errors="coerce")
     df["Ensemble"] = pd.to_numeric(df["Ensemble"], errors="coerce")
     df = df.dropna(subset=["ds", "Ensemble"]).sort_values("ds")
+    df = df[df["ds"] >= today]
     df["Day of Week"] = df["ds"].dt.day_name()
     df["Day of Week Num"] = df["ds"].dt.dayofweek
     df["Is Weekend"] = df["Day of Week Num"].isin([5, 6])
@@ -326,26 +332,41 @@ def prepare_forecast() -> pd.DataFrame:
     return df
 
 
-def label_for_volume(volume: float, historical: pd.DataFrame) -> tuple[str, str]:
-    q30 = historical["Vehicles Per Day"].quantile(0.30)
-    q55 = historical["Vehicles Per Day"].quantile(0.55)
-    q80 = historical["Vehicles Per Day"].quantile(0.80)
-    if volume <= q30:
+def seasonal_baseline(historical: pd.DataFrame, date: pd.Timestamp) -> pd.Series:
+    """Traffic for the same time of year in recent years, so summer is judged against summer."""
+    cutoff = historical["Date"].max() - pd.DateOffset(years=SEASONAL_BASELINE_YEARS)
+    recent = historical.loc[historical["Date"] >= cutoff]
+    day_gap = (recent["Date"].dt.dayofyear - date.dayofyear).abs()
+    day_gap = day_gap.where(day_gap <= 182, 365 - day_gap)
+    return recent.loc[day_gap <= SEASONAL_WINDOW_DAYS, "Vehicles Per Day"]
+
+
+def seasonal_percentile(volume: float, date: pd.Timestamp, historical: pd.DataFrame) -> float:
+    baseline = seasonal_baseline(historical, date)
+    if baseline.empty:
+        baseline = historical["Vehicles Per Day"]
+    if baseline.empty:
+        return 50.0
+    return float((baseline < volume).mean() * 100)
+
+
+def label_for_volume(volume: float, date: pd.Timestamp, historical: pd.DataFrame) -> tuple[str, str]:
+    percentile = seasonal_percentile(volume, date, historical)
+    if percentile <= 30:
         return "Best day to visit", "best"
-    if volume <= q55:
+    if percentile <= 55:
         return "Good day to visit", "good"
-    if volume <= q80:
+    if percentile <= 80:
         return "Busy day", "warning"
     return "Avoid if possible", "bad"
 
 
 def compute_traffic_score(forecast: pd.DataFrame, historical: pd.DataFrame) -> pd.Series:
-    avg = historical["Vehicles Per Day"].mean()
-    std = historical["Vehicles Per Day"].std()
-    if pd.isna(std) or std == 0:
-        return pd.Series(50.0, index=forecast.index)
-    score = 50 - (((forecast["Ensemble"] - avg) / std) * 25)
-    return score.clip(lower=0, upper=100).round(1)
+    scores = forecast.apply(
+        lambda row: 100 - seasonal_percentile(row["Ensemble"], row["ds"], historical),
+        axis=1,
+    )
+    return scores.astype(float).round(1)
 
 
 def filter_forecast_days(forecast: pd.DataFrame, day_filter: str) -> pd.DataFrame:
@@ -419,16 +440,21 @@ def compute_recommendations(forecast: pd.DataFrame, historical: pd.DataFrame, da
 
     scored = filtered.copy()
     scored["Traffic Score"] = compute_traffic_score(scored, historical)
-    scored = scored.sort_values(["Traffic Score", "Ensemble"], ascending=[False, True])
-    best_day = scored.iloc[0]
-    worst_day = scored.sort_values(["Traffic Score", "Ensemble"], ascending=[True, False]).iloc[0]
-    top_days = scored.head(min(3, len(scored)))
-    avoid_days = scored.sort_values(["Traffic Score", "Ensemble"], ascending=[True, False]).head(min(3, len(scored)))
+    quietest = scored.sort_values("Ensemble", ascending=True)
+    busiest = scored.sort_values("Ensemble", ascending=False)
+    best_day = quietest.iloc[0]
+    worst_day = busiest.iloc[0]
+    top_days = quietest.head(min(3, len(scored)))
+    avoid_days = busiest.head(min(3, len(scored)))
     confidence_label, confidence_detail = get_confidence_message(filtered)
     trend_label, trend_detail = get_trend_message(historical, filtered.sort_values("ds"))
     weekly_insight, seasonal_insight = build_insights(historical)
-    busy_threshold = historical["Vehicles Per Day"].quantile(0.80)
-    busy_days_count = int((filtered["Ensemble"] >= busy_threshold).sum())
+    busy_days_count = int(
+        filtered.apply(
+            lambda row: seasonal_percentile(row["Ensemble"], row["ds"], historical) > 80,
+            axis=1,
+        ).sum()
+    )
     scope = "weekdays" if day_filter == "Weekdays only" else "weekends" if day_filter == "Weekends only" else "days"
     recommendation = (
         f"Go on {best_day['ds'].strftime('%A, %b %d')}. "
@@ -467,8 +493,8 @@ def render_decision_card(title: str, emoji: str, day_text: str, status: str, veh
 
 
 def render_hero(summary: ForecastSummary, historical: pd.DataFrame) -> None:
-    best_label, _ = label_for_volume(summary.best_day["Ensemble"], historical)
-    worst_label, _ = label_for_volume(summary.worst_day["Ensemble"], historical)
+    best_label, _ = label_for_volume(summary.best_day["Ensemble"], summary.best_day["ds"], historical)
+    worst_label, _ = label_for_volume(summary.worst_day["Ensemble"], summary.worst_day["ds"], historical)
     hero_html = (
         '<div class="hero-shell">'
         '<h1 class="hero-title">Banff Visit Planner</h1>'
@@ -640,7 +666,7 @@ def render_pick_pills(days: pd.DataFrame, historical: pd.DataFrame, title: str, 
     st.markdown(f"#### {title}")
     columns = st.columns(len(days)) if len(days) > 0 else []
     for rank, ((_, row), column) in enumerate(zip(days.iterrows(), columns), start=1):
-        label, tone = label_for_volume(row["Ensemble"], historical)
+        label, tone = label_for_volume(row["Ensemble"], row["ds"], historical)
         badge_class = {
             "best": "badge-best",
             "good": "badge-good",
@@ -750,7 +776,10 @@ def render_monthly_patterns(historical: pd.DataFrame) -> None:
 def render_forecast_table(forecast: pd.DataFrame, historical: pd.DataFrame) -> None:
     table = forecast[["ds", "Day of Week", "Ensemble"]].copy()
     table.columns = ["Date", "Day", "Forecasted Vehicles"]
-    table["Visit signal"] = table["Forecasted Vehicles"].apply(lambda v: label_for_volume(v, historical)[0])
+    table["Visit signal"] = table.apply(
+        lambda row: label_for_volume(row["Forecasted Vehicles"], row["Date"], historical)[0],
+        axis=1,
+    )
     st.dataframe(table, hide_index=True, width="stretch")
 
 
@@ -759,9 +788,16 @@ def main() -> None:
 
     try:
         historical = prepare_historical()
-        forecast = prepare_forecast()
+        forecast = prepare_forecast(pd.Timestamp.today().normalize())
     except Exception as exc:
         st.error(f"Unable to load dashboard data: {exc}")
+        st.stop()
+
+    if forecast.empty:
+        st.warning(
+            "The published forecast has expired — every day it covers is now in the past. "
+            "New predictions are generated on the 1st and 16th of each month."
+        )
         st.stop()
 
     with st.sidebar:
