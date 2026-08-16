@@ -20,7 +20,7 @@ Combined two-way traffic data from the Town of Banff, Alberta (July 2013 - Prese
 ## Automated Data Updates
 
 The historical dataset (`TW Traffic _data.csv`) and forecast data (`predictions.csv`) are kept up-to-date automatically:
-- A Python script (`extract_data.py`) fetches the latest `.twb` workbook from Tableau Public, extracts the underlying `.hyper` database, and aggregates the daily traffic counts.
+- A Python script (`extract_data.py`) fetches the latest `.twb` workbook from Tableau Public, extracts the underlying `.hyper` database, and aggregates the daily traffic counts. Tableau Public rate-limits bursts, so the download retries up to five times with exponential backoff (honouring `Retry-After`) before giving up.
 - Another script (`update_predictions.py`) runs the pretrained neural forecasting models to dynamically generate the next 15 days of predictions based on the latest available data.
 - A GitHub Actions workflow (`.github/workflows/update_data.yml`) runs on the 1st and 16th of each month at 06:00 UTC, and can also be triggered manually via `workflow_dispatch`.
 - The workflow downloads the pretrained `modelos_exo` bundle from the `modelos-exo-v1` GitHub Release before generating forecasts. The bundle is not committed to the repository.

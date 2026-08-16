@@ -4,12 +4,37 @@ import io
 import pantab
 import pandas as pd
 import tempfile
+import time
 import os
+
+RETRY_STATUSES = {429, 500, 502, 503, 504}
+
+
+def fetch_workbook(url, attempts=5):
+    """Tableau Public rate-limits bursts; a scheduled run should wait rather than fail."""
+    for attempt in range(1, attempts + 1):
+        try:
+            response = requests.get(url, timeout=120)
+        except requests.RequestException as exc:
+            reason = str(exc)
+            wait = 5 * 2 ** (attempt - 1)
+        else:
+            # raise_for_status raises RequestException, so keep it clear of the retry handler
+            if response.status_code not in RETRY_STATUSES:
+                response.raise_for_status()
+                return response
+            reason = f"HTTP {response.status_code}"
+            wait = float(response.headers.get("Retry-After", 0)) or 5 * 2 ** (attempt - 1)
+
+        if attempt == attempts:
+            raise RuntimeError(f"Tableau fetch failed after {attempts} attempts: {reason}")
+        print(f"Attempt {attempt}/{attempts} failed ({reason}); retrying in {wait:.0f}s")
+        time.sleep(wait)
+
 
 def main():
     url = "https://public.tableau.com/workbooks/BanffTrafficData-GS.twb"
-    r = requests.get(url)
-    r.raise_for_status()
+    r = fetch_workbook(url)
 
     with zipfile.ZipFile(io.BytesIO(r.content)) as z:
         hyper_files = [name for name in z.namelist() if name.endswith(".hyper")]
