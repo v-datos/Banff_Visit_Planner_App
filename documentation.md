@@ -150,6 +150,8 @@ Exogenous features are generated in `update_predictions.py`: a trend term, Fouri
 
 Before `predictions.csv` is written, the run is rejected if the forecast contains NaN values or falls implausibly far below recent history.
 
+The per-model columns are kept in `predictions.csv`, and the app uses their min/max range as a model-agreement band — shown on the chart and summarised in the hero card. This measures how closely the members line up, which is not the same as accuracy: they share training data and can be wrong together. Typical spread is 1-8% of the forecast value.
+
 ## License
 
 Released under the MIT License. See [LICENSE](LICENSE) for the full text.

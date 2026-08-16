@@ -46,8 +46,8 @@ class ForecastSummary:
     avoid_days: pd.DataFrame
     recommendation: str
     best_window_text: str
-    confidence_label: str
-    confidence_detail: str
+    agreement_label: str
+    agreement_detail: str
     trend_label: str
     trend_detail: str
     busy_days_count: int
@@ -323,12 +323,22 @@ def prepare_forecast(today: pd.Timestamp) -> pd.DataFrame:
     df["Ensemble"] = pd.to_numeric(df["Ensemble"], errors="coerce")
     df = df.dropna(subset=["ds", "Ensemble"]).sort_values("ds")
     df = df[df["ds"] >= today]
-    df["Day of Week"] = df["ds"].dt.day_name()
-    df["Day of Week Num"] = df["ds"].dt.dayofweek
-    df["Is Weekend"] = df["Day of Week Num"].isin([5, 6])
     for col in ["yhat_lower", "yhat_upper"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # The ensemble members are published per model; their range is the only
+    # spread the pipeline gives us, so derive the band when none is supplied.
+    if not {"yhat_lower", "yhat_upper"}.issubset(df.columns):
+        members = df.columns.difference(["unique_id", "ds", "Ensemble", "yhat_lower", "yhat_upper"])
+        member_values = df[members].apply(pd.to_numeric, errors="coerce").dropna(axis=1, how="any")
+        if member_values.shape[1] >= 2:
+            df["yhat_lower"] = member_values.min(axis=1)
+            df["yhat_upper"] = member_values.max(axis=1)
+
+    df["Day of Week"] = df["ds"].dt.day_name()
+    df["Day of Week Num"] = df["ds"].dt.dayofweek
+    df["Is Weekend"] = df["Day of Week Num"].isin([5, 6])
     return df
 
 
@@ -377,17 +387,23 @@ def filter_forecast_days(forecast: pd.DataFrame, day_filter: str) -> pd.DataFram
     return forecast.copy()
 
 
-def get_confidence_message(forecast: pd.DataFrame) -> tuple[str, str]:
-    if {"yhat_lower", "yhat_upper"}.issubset(forecast.columns):
-        width = (forecast["yhat_upper"] - forecast["yhat_lower"]).median()
-        center = forecast["Ensemble"].median()
-        relative = width / center if center else 0
-        if relative < 0.15:
-            return "High", "Forecast spread is tight across the next two weeks."
-        if relative < 0.30:
-            return "Moderate", "The outlook is stable, with normal day-to-day uncertainty."
-        return "Lower", "Expect more variation than usual, especially on busy days."
-    return "Moderate", "Based on model output without published interval bands."
+def get_agreement_message(forecast: pd.DataFrame) -> tuple[str, str]:
+    """How closely the ensemble members line up. Agreement is not accuracy — the
+    members share training data, so they can be wrong together."""
+    if not {"yhat_lower", "yhat_upper"}.issubset(forecast.columns):
+        return "Unknown", "The forecast was published without a model range."
+
+    width = (forecast["yhat_upper"] - forecast["yhat_lower"]).median()
+    center = forecast["Ensemble"].median()
+    if not center:
+        return "Unknown", "The forecast was published without a model range."
+
+    relative = width / center
+    if relative < 0.025:
+        return "High", f"The forecast models sit within {relative * 100:.1f}% of each other."
+    if relative < 0.05:
+        return "Moderate", f"The forecast models differ by about {relative * 100:.1f}% on a typical day."
+    return "Mixed", f"The forecast models disagree by around {relative * 100:.1f}%, so treat close calls loosely."
 
 
 def get_trend_message(historical: pd.DataFrame, forecast: pd.DataFrame) -> tuple[str, str]:
@@ -446,7 +462,7 @@ def compute_recommendations(forecast: pd.DataFrame, historical: pd.DataFrame, da
     worst_day = busiest.iloc[0]
     top_days = quietest.head(min(3, len(scored)))
     avoid_days = busiest.head(min(3, len(scored)))
-    confidence_label, confidence_detail = get_confidence_message(filtered)
+    agreement_label, agreement_detail = get_agreement_message(filtered)
     trend_label, trend_detail = get_trend_message(historical, filtered.sort_values("ds"))
     weekly_insight, seasonal_insight = build_insights(historical)
     busy_days_count = int(
@@ -468,8 +484,8 @@ def compute_recommendations(forecast: pd.DataFrame, historical: pd.DataFrame, da
         avoid_days=avoid_days,
         recommendation=recommendation,
         best_window_text=compute_best_window(filtered.sort_values("ds")),
-        confidence_label=confidence_label,
-        confidence_detail=confidence_detail,
+        agreement_label=agreement_label,
+        agreement_detail=agreement_detail,
         trend_label=trend_label,
         trend_detail=trend_detail,
         busy_days_count=busy_days_count,
@@ -524,11 +540,11 @@ def render_hero(summary: ForecastSummary, historical: pd.DataFrame) -> None:
             f'<div class="card-date">{summary.best_window_text}</div>'
             f'<div class="card-status">{summary.trend_label}</div>'
             f'<div class="card-metric">{summary.busy_days_count} busy {summary.filtered_days_label}</div>'
-            f'<div class="card-detail">{summary.confidence_label} confidence. {summary.trend_detail}</div>'
+            f'<div class="card-detail">{summary.agreement_label} model agreement. {summary.trend_detail}</div>'
             "</div>"
         )
         + "</div>"
-        f'<div class="banner"><strong>Recommendation:</strong> {summary.recommendation}<br><span class="muted">Best low-traffic window: {summary.best_window_text}. {summary.confidence_detail}</span></div>'
+        f'<div class="banner"><strong>Recommendation:</strong> {summary.recommendation}<br><span class="muted">Best low-traffic window: {summary.best_window_text}. {summary.agreement_detail}</span></div>'
         "</div>"
     )
     st.markdown(hero_html, unsafe_allow_html=True)
