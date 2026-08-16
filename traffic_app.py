@@ -292,6 +292,44 @@ def inject_styles() -> None:
         .muted {{
             color: {COLORS["secondary"]};
         }}
+        @media (max-width: 900px) {{
+            .hero-grid,
+            .small-card-grid,
+            .insight-grid {{
+                grid-template-columns: 1fr;
+            }}
+            .decision-card,
+            .decision-kpi {{
+                min-height: 0;
+            }}
+            .hero-title {{
+                font-size: 2.1rem;
+            }}
+        }}
+        @media (max-width: 640px) {{
+            .block-container {{
+                padding-top: 1rem;
+                padding-left: 0.6rem;
+                padding-right: 0.6rem;
+            }}
+            .hero-shell {{
+                border-radius: 18px;
+                padding: 1.1rem 1rem;
+            }}
+            .hero-title {{
+                font-size: 1.75rem;
+            }}
+            .hero-sub {{
+                font-size: 0.95rem;
+            }}
+            .decision-card {{
+                border-radius: 18px;
+                padding: 1rem;
+            }}
+            .card-date {{
+                font-size: 1.6rem;
+            }}
+        }}
         </style>
         """,
         unsafe_allow_html=True,
