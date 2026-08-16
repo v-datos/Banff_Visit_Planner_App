@@ -30,6 +30,7 @@ wheels/
 # IDE
 .vscode/
 .idea/
+.junie/
 *.swp
 *.swo
 *~
@@ -40,6 +41,9 @@ Thumbs.db
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Claude Code local settings
+.claude/settings.local.json
 
 # Jupyter Notebook
 .ipynb_checkpoints

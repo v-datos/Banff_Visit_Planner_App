@@ -55,10 +55,11 @@ The update workflow is set to run on the 1st and 16th of each month.
 
 ## Repository guide
 
-- Main app: [traffic_app.py](/Users/micra/Dataland/visit_planner_app/traffic_app.py:1)
-- Technical documentation: [documentation.md](/Users/micra/Dataland/visit_planner_app/documentation.md:1)
-- Forecast updater: [update_predictions.py](/Users/micra/Dataland/visit_planner_app/update_predictions.py:1)
-- Data extractor: [extract_data.py](/Users/micra/Dataland/visit_planner_app/extract_data.py:1)
+- Main app: [traffic_app.py](traffic_app.py)
+- Technical documentation: [documentation.md](documentation.md)
+- Forecast updater: [update_predictions.py](update_predictions.py)
+- Data extractor: [extract_data.py](extract_data.py)
+- Shared data helpers: [data_utils.py](data_utils.py)
 
 ## Local run
 

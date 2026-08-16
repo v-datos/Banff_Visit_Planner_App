@@ -7,8 +7,9 @@ An interactive Streamlit app that helps tourists decide when to visit Banff with
 - **Decision-First Visit Planner**: Highlights the best day to visit and the busiest day to avoid
 - **Traffic Forecasts**: Shows the upcoming 15-day traffic outlook
 - **Planning Picks**: Surfaces top recommended days and days to avoid
+- **Trip Filters**: Restrict recommendations to weekdays only or weekends only
 - **Day of Week Analysis**: Compare average traffic by day of week
-- **Monthly Patterns**: Visualize seasonal trends across multiple years
+- **Monthly Patterns**: Visualize seasonal trends across the three most recent years
 - **Automated Data Updates**: Built-in data extraction script and GitHub Actions workflow to keep historical traffic data and AI forecasts up-to-date
 
 ## Data Source
@@ -21,9 +22,11 @@ Combined two-way traffic data from the Town of Banff, Alberta (July 2013 - Prese
 The historical dataset (`TW Traffic _data.csv`) and forecast data (`predictions.csv`) are kept up-to-date automatically:
 - A Python script (`extract_data.py`) fetches the latest `.twb` workbook from Tableau Public, extracts the underlying `.hyper` database, and aggregates the daily traffic counts.
 - Another script (`update_predictions.py`) runs the pretrained neural forecasting models to dynamically generate the next 15 days of predictions based on the latest available data.
-- A GitHub Actions workflow (`.github/workflows/update_data.yml`) runs on the 1st and 16th of each month.
-- The workflow downloads the pretrained `modelos_exo` bundle from a GitHub Release before generating forecasts.
+- A GitHub Actions workflow (`.github/workflows/update_data.yml`) runs on the 1st and 16th of each month at 06:00 UTC, and can also be triggered manually via `workflow_dispatch`.
+- The workflow downloads the pretrained `modelos_exo` bundle from the `modelos-exo-v1` GitHub Release before generating forecasts. The bundle is not committed to the repository.
 - The workflow automatically commits and pushes the updated CSVs back to the repository.
+
+Each run produces a 15-day forecast starting the day after the last complete day of history, so the published forecast window shifts forward with every run. The most recent day in the source data is dropped automatically when it is a partial day (see `normalize_historical_traffic` in `data_utils.py`).
 
 ## Visit Signals
 
@@ -40,9 +43,9 @@ git clone <your-repository-url>
 cd visit_planner_app
 ```
 
-2. Activate the virtual environment:
+2. Create and activate a virtual environment:
 ```bash
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 ```
 
 3. Install required dependencies:
@@ -59,6 +62,13 @@ pip install -r requirements-update.txt
 4. Ensure you have the required data files:
    - `TW Traffic _data.csv` - Historical traffic data (updated automatically via GitHub Actions, or manually via `python extract_data.py`)
    - `predictions.csv` - Forecast data (updated automatically via GitHub Actions, or manually via `python update_predictions.py`)
+
+5. To regenerate forecasts locally, download the pretrained model bundle. It is excluded from version control, so `update_predictions.py` fails without it:
+```bash
+gh release download modelos-exo-v1 --pattern modelos_exo.zip && unzip -q modelos_exo.zip
+```
+
+Running the app itself only needs `requirements.txt` plus the two CSVs — the model bundle is not required.
 
 ## Running the App
 
@@ -89,36 +99,60 @@ This app can be deployed on:
 ```text
 Visit_Planner_App/
 ├── .github/workflows/       # GitHub Actions for automated data updates
+├── .devcontainer/           # Dev container / Codespaces configuration
 ├── traffic_app.py           # Main Streamlit application
 ├── data_utils.py            # Shared data loading and normalization helpers
 ├── extract_data.py          # Script to download and process Tableau data
 ├── update_predictions.py    # Script to dynamically generate AI traffic forecasts
-├── modelos_exo/             # Pretrained neural forecast models
-├── TW Traffic _data.csv     # Historical traffic data
+├── TW Traffic _data.csv     # Historical traffic data (UTF-16, tab-separated)
 ├── predictions.csv          # Forecast data
-├── requirements.txt         # Python dependencies
+├── requirements.txt         # Runtime dependencies for the Streamlit app
 ├── requirements-update.txt  # Extra dependencies for data extraction and forecast updates
+├── visit_planner.png        # README header image
 ├── documentation.md         # Technical project documentation
+├── LICENSE                  # MIT License
 └── README.md                # Public repository overview
+```
+
+Not tracked in the repository (created locally or fetched on demand):
+
+```text
+├── modelos_exo/             # Pretrained neural forecast models (GitHub Release modelos-exo-v1)
+├── lightning_logs/          # PyTorch Lightning training output
+└── .venv/                   # Local virtual environment
 ```
 
 ## Technologies Used
 
-- **Python 3.8+**
+**Python 3.13** (pinned in CI and used locally)
+
+App runtime (`requirements.txt`):
 - **Streamlit** - Web app framework
 - **Pandas** - Data manipulation
 - **Plotly** - Interactive visualizations
 - **NumPy** - Numerical operations
 
+Update pipeline (`requirements-update.txt`):
+- **requests** - Downloads the Tableau workbook
+- **pantab** - Reads the `.hyper` extract
+- **neuralforecast** / **utilsforecast** - Forecast models and exogenous feature engineering
+- **torch** / **pytorch-lightning** - Model execution backend
+
 ## Forecast Method
 
-The forecasts are generated using neural ensemble forecasting combining:
-- **NBEATSx** (Neural Basis Expansion Analysis for Time Series with exogenous variables)
+Forecasts come from a saved `NeuralForecast` bundle whose member models are averaged into a single `Ensemble` column. The bundle combines NBEATS, NBEATSx, and NHITSx variants trained with different seasonality windows:
+
+- **NBEATS** (Neural Basis Expansion Analysis for Time Series)
+- **NBEATSx** (NBEATS with exogenous variables)
 - **NHITSx** (Neural Hierarchical Interpolation for Time Series with exogenous variables)
+
+Exogenous features are generated in `update_predictions.py`: a trend term, Fourier terms at 7-, 365-, and 730-day season lengths, plus weekday, month, and year.
+
+Before `predictions.csv` is written, the run is rejected if the forecast contains NaN values or falls implausibly far below recent history.
 
 ## License
 
-MIT License
+Released under the MIT License. See [LICENSE](LICENSE) for the full text.
 
 ## Contributing
 
