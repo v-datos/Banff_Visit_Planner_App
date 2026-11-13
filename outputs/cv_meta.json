@@ -1,0 +1,16 @@
+{
+  "model_weights": {
+    "Hybrid_Ridge_CatBoost": 0.5006772607470366,
+    "MLForecast_LGBM": 0.25924710195137673,
+    "Ridge_AR_Exo": 0.18008089634614796,
+    "LogMSTL_ETS": 0.05999474095543858
+  },
+  "cv_info": {
+    "n_folds": 12,
+    "n_oof_days": 192,
+    "horizon_days": 16,
+    "empirical_cov80_pct": 79.2,
+    "empirical_cov95_pct": 94.8,
+    "runtime_sec": 25.77
+  }
+}
