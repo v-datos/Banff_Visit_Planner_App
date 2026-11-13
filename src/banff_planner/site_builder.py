@@ -8,6 +8,15 @@ from typing import Dict
 
 from banff_planner.config import SITE_DIR
 
+_FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#0E1116"/>
+  <polygon points="8,48 24,22 40,48" fill="#1F4E5F"/>
+  <polygon points="20,48 38,14 56,48" fill="#14B8A6"/>
+  <polygon points="38,14 31,27 36,25 38,28 41,25 45,27" fill="#F8FAFC"/>
+  <path d="M12,51 Q32,43 52,51" stroke="#39FF14" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+</svg>
+"""
+
 _HTML_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
@@ -15,6 +24,7 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Banff Visit Planner — 15-Day Crowd &amp; Weather Forecast</title>
   <meta name="description" content="Data-driven 15-day trip planner for Banff, Alberta combining Town of Banff entrance traffic counters, weather forecasts, Alberta holiday bridges, and conformal uncertainty intervals." />
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -2239,6 +2249,7 @@ def build_static_site(payload: Dict, site_dir: Path = SITE_DIR) -> Path:
     html = _HTML_TEMPLATE.replace("__PAYLOAD_JSON__", payload_json)
     out_html = site_dir / "index.html"
     out_html.write_text(html, encoding="utf-8")
+    (site_dir / "favicon.svg").write_text(_FAVICON_SVG, encoding="utf-8")
     # Also write .nojekyll so GitHub Pages skips Jekyll processing cleanly
     (site_dir / ".nojekyll").write_text("", encoding="utf-8")
     return out_html

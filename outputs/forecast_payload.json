@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0.0",
-  "generated_at_utc": "2026-11-13 16:59 UTC",
+  "generated_at_utc": "2026-11-13 19:56 UTC",
   "generated_date_mt": "2026-11-13",
   "forecast_window": {
     "start": "2026-11-13",
@@ -9,7 +9,7 @@
     "total_horizon_days": 17
   },
   "data_freshness": {
-    "generated_at_utc": "2026-11-13 16:59 UTC",
+    "generated_at_utc": "2026-11-13 19:56 UTC",
     "generated_date_mt": "2026-11-13",
     "traffic_days": 4882,
     "traffic_start_date": "2013-07-01",
