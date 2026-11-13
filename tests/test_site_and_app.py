@@ -48,6 +48,12 @@ def test_published_forecast_and_artifacts_integrity():
     assert payload_file.exists()
     assert site_payload_file.exists()
     assert (SITE_DIR / ".nojekyll").exists()
+    favicon_path = SITE_DIR / "favicon.svg"
+    assert favicon_path.exists(), f"Missing favicon.svg at {favicon_path}"
+    assert "<svg" in favicon_path.read_text(encoding="utf-8")
+    index_html = (SITE_DIR / "index.html").read_text(encoding="utf-8")
+    assert '<link rel="icon" type="image/svg+xml" href="./favicon.svg" />' in index_html
+    assert 'href="/favicon.svg"' not in index_html
     assert ROOT_PREDICTIONS_CSV.exists()
 
     payload = json.loads(payload_file.read_text(encoding="utf-8"))
