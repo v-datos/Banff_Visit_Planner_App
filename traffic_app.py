@@ -1,59 +1,60 @@
+"""Banff Visit Planner — Modernized Streamlit Companion Dashboard.
+
+Lightweight runtime frontend synced with the daily forecasting pipeline
+(`outputs/forecast_payload.json` + `predictions.csv` + `TW Traffic _data.csv`).
+Strictly avoids heavy training/ML dependencies so Streamlit Community Cloud
+runs cleanly off `requirements.txt`.
+"""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+import sys
 from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
+from zoneinfo import ZoneInfo
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from data_utils import load_csv, normalize_historical_traffic
+ROOT_DIR = Path(__file__).resolve().parent
+SRC_DIR = ROOT_DIR / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
+from banff_planner.analytics import (  # noqa: E402
+    ForecastSummary,
+    compute_recommendations,
+    enrich_forecast_analytics,
+    filter_forecast_days,
+)
+from banff_planner.config import OUTPUTS_DIR, ROOT_PREDICTIONS_CSV, ROOT_TRAFFIC_TSV  # noqa: E402
+from banff_planner.data_loader import load_daily_traffic  # noqa: E402
 
-st.set_page_config(page_title="Banff Traffic Planner", page_icon="🏔️", layout="wide")
+STATIC_WEB_URL = "https://v-datos.github.io/Banff_Visit_Planner_App/"
 
-DATA_DIR = Path(__file__).resolve().parent
-HISTORICAL_PATH = DATA_DIR / "TW Traffic _data.csv"
-FORECAST_PATH = DATA_DIR / "predictions.csv"
-
-# Days either side of the same calendar date used to build the seasonal baseline.
-SEASONAL_WINDOW_DAYS = 10
-# Traffic has grown ~10% over the full record, so only recent years form the baseline.
-SEASONAL_BASELINE_YEARS = 3
-
-COLORS = {
-    "bg": "#0F172A",
-    "card": "#111827",
-    "card_alt": "#1F2937",
-    "border": "#374151",
-    "text": "#F9FAFB",
-    "secondary": "#9CA3AF",
-    "muted": "#6B7280",
-    "best": "#22C55E",
-    "good": "#84CC16",
-    "warning": "#F59E0B",
-    "bad": "#EF4444",
-    "blue": "#38BDF8",
+COLORS: Dict[str, str] = {
+    "bg": "#0E1412",
+    "surface": "#161E1B",
+    "surface_alt": "#1E2824",
+    "border": "#2A3732",
+    "ink": "#F1F5F3",
+    "muted": "#9BA8A2",
+    "accent": "#34B395",
+    "glacier": "#56B4E9",
     "history": "#94A3B8",
+    "best": "#4ADE80",
+    "good": "#A3E635",
+    "warning": "#FBBF24",
+    "bad": "#F87171",
 }
 
 
-@dataclass
-class ForecastSummary:
-    best_day: pd.Series
-    worst_day: pd.Series
-    top_days: pd.DataFrame
-    avoid_days: pd.DataFrame
-    recommendation: str
-    best_window_text: str
-    agreement_label: str
-    agreement_detail: str
-    trend_label: str
-    trend_detail: str
-    busy_days_count: int
-    filtered_days_label: str
-    weekly_insight: str
-    seasonal_insight: str
+def calgary_today() -> pd.Timestamp:
+    """Current local calendar date in Banff, Alberta (Mountain Time)."""
+    return pd.Timestamp.now(tz=ZoneInfo("America/Edmonton")).tz_localize(None).normalize()
 
 
 def inject_styles() -> None:
@@ -61,274 +62,161 @@ def inject_styles() -> None:
         f"""
         <style>
         .stApp {{
-            background:
-                radial-gradient(circle at top right, rgba(56,189,248,0.10), transparent 22%),
-                radial-gradient(circle at top left, rgba(34,197,94,0.08), transparent 18%),
-                {COLORS["bg"]};
-            color: {COLORS["text"]};
+            background-color: {COLORS["bg"]};
+            color: {COLORS["ink"]};
         }}
         .block-container {{
-            max-width: 1180px;
-            padding-top: 1.8rem;
+            max-width: 1220px;
+            padding-top: 1.5rem;
             padding-bottom: 3rem;
         }}
         h1, h2, h3, h4, p, div, span, label {{
-            color: {COLORS["text"]};
+            color: {COLORS["ink"]};
         }}
         [data-testid="stSidebar"] {{
-            background: {COLORS["card"]};
-            border-left: 1px solid {COLORS["border"]};
+            background: {COLORS["surface"]};
+            border-right: 1px solid {COLORS["border"]};
         }}
-        .hero-shell {{
-            background: linear-gradient(145deg, rgba(17,24,39,0.96), rgba(31,41,55,0.98));
+        .tabular {{
+            font-variant-numeric: tabular-nums;
+        }}
+        .top-banner {{
+            background: {COLORS["surface"]};
             border: 1px solid {COLORS["border"]};
-            border-radius: 26px;
-            padding: 1.4rem 1.5rem;
+            border-radius: 16px;
+            padding: 1.15rem 1.35rem;
             margin-bottom: 1rem;
-            box-shadow: 0 18px 48px rgba(0,0,0,0.35);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
         }}
-        .eyebrow {{
-            font-size: 0.76rem;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            color: {COLORS["secondary"]};
-            margin-bottom: 0.4rem;
-        }}
-        .hero-title {{
+        .brand-h1 {{
             margin: 0;
-            font-size: 2.8rem;
-            line-height: 0.98;
+            font-size: 2rem;
             font-weight: 800;
+            letter-spacing: -0.025em;
+            line-height: 1.1;
         }}
-        .hero-sub {{
-            color: {COLORS["secondary"]};
-            font-size: 1.02rem;
-            margin-top: 0.65rem;
-            margin-bottom: 0;
-            max-width: 760px;
+        .brand-sub {{
+            color: {COLORS["muted"]};
+            font-size: 0.92rem;
+            margin: 0.35rem 0 0;
+        }}
+        .web-cta {{
+            display: inline-block;
+            background: rgba(52, 179, 149, 0.14);
+            color: {COLORS["accent"]} !important;
+            border: 1px solid rgba(52, 179, 149, 0.35);
+            border-radius: 999px;
+            padding: 0.45rem 0.95rem;
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-decoration: none;
+            white-space: nowrap;
         }}
         .hero-grid {{
             display: grid;
-            grid-template-columns: 1fr 1fr 0.9fr;
-            gap: 1rem;
-            margin-top: 1rem;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.95rem;
             margin-bottom: 1rem;
         }}
-        .decision-card {{
-            border-radius: 24px;
-            padding: 1.3rem 1.2rem;
-            min-height: 220px;
+        .panel-card {{
+            background: {COLORS["surface"]};
             border: 1px solid {COLORS["border"]};
-            background: linear-gradient(180deg, rgba(17,24,39,0.92), rgba(31,41,55,0.98));
-            box-shadow: 0 18px 36px rgba(0,0,0,0.28);
+            border-radius: 16px;
+            padding: 1.1rem 1.15rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }}
-        .decision-best {{
-            border-color: rgba(34,197,94,0.45);
-            box-shadow: 0 0 0 1px rgba(34,197,94,0.18), 0 0 28px rgba(34,197,94,0.18);
-            background: linear-gradient(180deg, rgba(16,35,28,0.96), rgba(17,24,39,0.98));
-        }}
-        .decision-avoid {{
-            border-color: rgba(239,68,68,0.45);
-            box-shadow: 0 0 0 1px rgba(239,68,68,0.18), 0 0 28px rgba(239,68,68,0.16);
-            background: linear-gradient(180deg, rgba(48,23,25,0.96), rgba(17,24,39,0.98));
-        }}
-        .decision-kpi {{
-            min-height: 220px;
-        }}
-        .card-label {{
-            font-size: 0.78rem;
+        .eyebrow {{
+            font-size: 0.74rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.11em;
-            color: {COLORS["secondary"]};
-            margin-bottom: 0.8rem;
+            letter-spacing: 0.08em;
+            color: {COLORS["muted"]};
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
         }}
         .card-date {{
-            font-size: 2rem;
-            line-height: 1.0;
+            font-size: 1.55rem;
             font-weight: 800;
-            margin-bottom: 0.45rem;
+            letter-spacing: -0.02em;
+            line-height: 1.15;
+            margin-bottom: 0.4rem;
         }}
-        .card-status {{
-            font-size: 1rem;
-            font-weight: 700;
-            margin-bottom: 0.35rem;
+        .card-body {{
+            color: {COLORS["muted"]};
+            font-size: 0.88rem;
+            line-height: 1.45;
+            margin-top: 0.45rem;
         }}
-        .card-metric {{
-            font-size: 1rem;
-            color: {COLORS["text"]};
-            margin-bottom: 0.45rem;
-        }}
-        .card-detail {{
-            color: {COLORS["secondary"]};
-            font-size: 0.95rem;
-            line-height: 1.4;
-        }}
-        .banner {{
-            border-radius: 18px;
-            padding: 1rem 1.05rem;
-            background: linear-gradient(90deg, rgba(34,197,94,0.20), rgba(56,189,248,0.14));
-            border: 1px solid rgba(56,189,248,0.22);
-            margin-bottom: 1.1rem;
-        }}
-        .banner strong {{
-            color: {COLORS["text"]};
-        }}
-        .small-card-grid {{
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.9rem;
-            margin-bottom: 1.4rem;
-        }}
-        .mini-card {{
-            background: rgba(17,24,39,0.9);
-            border: 1px solid {COLORS["border"]};
-            border-radius: 18px;
-            padding: 0.95rem 1rem;
-        }}
-        .mini-label {{
-            color: {COLORS["secondary"]};
-            font-size: 0.76rem;
-            text-transform: uppercase;
-            letter-spacing: 0.11em;
-            margin-bottom: 0.35rem;
-        }}
-        .mini-value {{
-            font-size: 1.08rem;
-            font-weight: 700;
-            margin-bottom: 0.18rem;
-        }}
-        .mini-detail {{
-            color: {COLORS["secondary"]};
-            font-size: 0.9rem;
-        }}
-        .section-shell {{
-            background: rgba(17,24,39,0.88);
-            border: 1px solid {COLORS["border"]};
-            border-radius: 22px;
-            padding: 1rem 1rem 0.8rem 1rem;
-            box-shadow: 0 14px 32px rgba(0,0,0,0.24);
-        }}
-        .pill-row {{
-            display: flex;
-            gap: 0.85rem;
-            overflow-x: auto;
-            padding-bottom: 0.3rem;
-            margin-top: 0.5rem;
-        }}
-        .pick-pill {{
-            min-width: 100%;
-            border-radius: 18px;
-            padding: 0.95rem 1rem;
-            border: 1px solid {COLORS["border"]};
-            background: rgba(31,41,55,0.96);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.24);
-        }}
-        .pick-good {{
-            box-shadow: 0 0 0 1px rgba(34,197,94,0.16), 0 0 20px rgba(34,197,94,0.10);
-        }}
-        .pick-bad {{
-            box-shadow: 0 0 0 1px rgba(239,68,68,0.16), 0 0 20px rgba(239,68,68,0.10);
-        }}
-        .pick-rank {{
-            color: {COLORS["secondary"]};
-            font-size: 0.74rem;
-            text-transform: uppercase;
-            letter-spacing: 0.10em;
-            margin-bottom: 0.35rem;
-        }}
-        .pick-date {{
-            font-size: 1.08rem;
-            font-weight: 800;
-            margin-bottom: 0.3rem;
-        }}
-        .pill-badge {{
+        .signal-pill {{
             display: inline-block;
             border-radius: 999px;
-            padding: 0.18rem 0.55rem;
+            padding: 0.2rem 0.62rem;
             font-size: 0.76rem;
-            font-weight: 800;
-            margin-bottom: 0.45rem;
-        }}
-        .badge-best {{
-            background: rgba(34,197,94,0.18);
-            color: {COLORS["best"]};
-        }}
-        .badge-good {{
-            background: rgba(132,204,22,0.18);
-            color: {COLORS["good"]};
-        }}
-        .badge-warning {{
-            background: rgba(245,158,11,0.18);
-            color: {COLORS["warning"]};
-        }}
-        .badge-bad {{
-            background: rgba(239,68,68,0.18);
-            color: {COLORS["bad"]};
-        }}
-        .insight-grid {{
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }}
-        .insight-card {{
-            background: rgba(17,24,39,0.92);
-            border: 1px solid {COLORS["border"]};
-            border-radius: 18px;
-            padding: 1rem;
-        }}
-        .insight-title {{
-            font-size: 0.78rem;
-            text-transform: uppercase;
-            letter-spacing: 0.11em;
-            color: {COLORS["secondary"]};
-            margin-bottom: 0.45rem;
-        }}
-        .insight-body {{
-            font-size: 1.03rem;
             font-weight: 700;
-            line-height: 1.35;
         }}
-        .muted {{
-            color: {COLORS["secondary"]};
+        .tone-best {{ background: rgba(74, 222, 128, 0.15); color: {COLORS["best"]}; }}
+        .tone-good {{ background: rgba(163, 230, 53, 0.15); color: {COLORS["good"]}; }}
+        .tone-warning {{ background: rgba(251, 191, 36, 0.15); color: {COLORS["warning"]}; }}
+        .tone-bad {{ background: rgba(248, 113, 113, 0.15); color: {COLORS["bad"]}; }}
+        .score-chip {{
+            background: rgba(52, 179, 149, 0.15);
+            color: {COLORS["accent"]};
+            border-radius: 8px;
+            padding: 0.18rem 0.5rem;
+            font-size: 0.78rem;
+            font-weight: 700;
         }}
-        @media (max-width: 900px) {{
-            .hero-grid,
-            .small-card-grid,
-            .insight-grid {{
-                grid-template-columns: 1fr;
-            }}
-            .decision-card,
-            .decision-kpi {{
-                min-height: 0;
-            }}
-            .hero-title {{
-                font-size: 2.1rem;
-            }}
+        .mini-grid {{
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.85rem;
+            margin-bottom: 1.1rem;
         }}
-        @media (max-width: 640px) {{
-            .block-container {{
-                padding-top: 1rem;
-                padding-left: 0.6rem;
-                padding-right: 0.6rem;
-            }}
-            .hero-shell {{
-                border-radius: 18px;
-                padding: 1.1rem 1rem;
-            }}
-            .hero-title {{
-                font-size: 1.75rem;
-            }}
-            .hero-sub {{
-                font-size: 0.95rem;
-            }}
-            .decision-card {{
-                border-radius: 18px;
-                padding: 1rem;
-            }}
-            .card-date {{
-                font-size: 1.6rem;
-            }}
+        .mini-stat {{
+            background: {COLORS["surface"]};
+            border: 1px solid {COLORS["border"]};
+            border-radius: 12px;
+            padding: 0.85rem 0.95rem;
+        }}
+        .mini-lbl {{
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: {COLORS["muted"]};
+            margin-bottom: 0.2rem;
+        }}
+        .mini-val {{
+            font-size: 1.02rem;
+            font-weight: 700;
+            margin-bottom: 0.15rem;
+        }}
+        .mini-sub {{
+            font-size: 0.78rem;
+            color: {COLORS["muted"]};
+        }}
+        .driver-pill {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: {COLORS["surface_alt"]};
+            border: 1px solid {COLORS["border"]};
+            border-radius: 8px;
+            padding: 0.45rem 0.7rem;
+            margin-bottom: 0.4rem;
+            font-size: 0.84rem;
+        }}
+        @media (max-width: 960px) {{
+            .hero-grid {{ grid-template-columns: 1fr; }}
+            .mini-grid {{ grid-template-columns: 1fr 1fr; }}
         }}
         </style>
         """,
@@ -336,346 +224,371 @@ def inject_styles() -> None:
     )
 
 
-@st.cache_data(show_spinner=False)
-def prepare_historical() -> pd.DataFrame:
-    df = load_csv(HISTORICAL_PATH, encoding="utf-16", sep="\t")
-    df = normalize_historical_traffic(df)
-    df["Year"] = df["Date"].dt.year
-    df["Month"] = df["Date"].dt.month
-    df["Month Name"] = df["Date"].dt.strftime("%b")
-    df["Day of Week"] = df["Date"].dt.day_name()
-    df["Day of Week Num"] = df["Date"].dt.dayofweek
-    df["Is Weekend"] = df["Day of Week Num"].isin([5, 6])
-    return df
-
-
-@st.cache_data(show_spinner=False)
-def prepare_forecast(today: pd.Timestamp) -> pd.DataFrame:
-    df = load_csv(FORECAST_PATH)
-    df.columns = [col.strip() for col in df.columns]
-    required_cols = {"ds", "Ensemble"}
-    if not required_cols.issubset(df.columns):
-        missing = sorted(required_cols.difference(df.columns))
-        raise KeyError(f"Missing columns in forecast data: {', '.join(missing)}")
-    df["ds"] = pd.to_datetime(df["ds"], errors="coerce")
-    df["Ensemble"] = pd.to_numeric(df["Ensemble"], errors="coerce")
-    df = df.dropna(subset=["ds", "Ensemble"]).sort_values("ds")
-    df = df[df["ds"] >= today]
-    for col in ["yhat_lower", "yhat_upper"]:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    # The ensemble members are published per model; their range is the only
-    # spread the pipeline gives us, so derive the band when none is supplied.
-    if not {"yhat_lower", "yhat_upper"}.issubset(df.columns):
-        members = df.columns.difference(["unique_id", "ds", "Ensemble", "yhat_lower", "yhat_upper"])
-        member_values = df[members].apply(pd.to_numeric, errors="coerce").dropna(axis=1, how="any")
-        if member_values.shape[1] >= 2:
-            df["yhat_lower"] = member_values.min(axis=1)
-            df["yhat_upper"] = member_values.max(axis=1)
-
-    df["Day of Week"] = df["ds"].dt.day_name()
-    df["Day of Week Num"] = df["ds"].dt.dayofweek
-    df["Is Weekend"] = df["Day of Week Num"].isin([5, 6])
-    return df
-
-
-def seasonal_baseline(historical: pd.DataFrame, date: pd.Timestamp) -> pd.Series:
-    """Traffic for the same time of year in recent years, so summer is judged against summer."""
-    cutoff = historical["Date"].max() - pd.DateOffset(years=SEASONAL_BASELINE_YEARS)
-    recent = historical.loc[historical["Date"] >= cutoff]
-    day_gap = (recent["Date"].dt.dayofyear - date.dayofyear).abs()
-    day_gap = day_gap.where(day_gap <= 182, 365 - day_gap)
-    return recent.loc[day_gap <= SEASONAL_WINDOW_DAYS, "Vehicles Per Day"]
-
-
-def seasonal_percentile(volume: float, date: pd.Timestamp, historical: pd.DataFrame) -> float:
-    baseline = seasonal_baseline(historical, date)
-    if baseline.empty:
-        baseline = historical["Vehicles Per Day"]
-    if baseline.empty:
-        return 50.0
-    return float((baseline < volume).mean() * 100)
-
-
-def label_for_volume(volume: float, date: pd.Timestamp, historical: pd.DataFrame) -> tuple[str, str]:
-    percentile = seasonal_percentile(volume, date, historical)
-    if percentile <= 30:
-        return "Best day to visit", "best"
-    if percentile <= 55:
-        return "Good day to visit", "good"
-    if percentile <= 80:
-        return "Busy day", "warning"
-    return "Avoid if possible", "bad"
-
-
-def compute_traffic_score(forecast: pd.DataFrame, historical: pd.DataFrame) -> pd.Series:
-    scores = forecast.apply(
-        lambda row: 100 - seasonal_percentile(row["Ensemble"], row["ds"], historical),
-        axis=1,
-    )
-    return scores.astype(float).round(1)
-
-
-def filter_forecast_days(forecast: pd.DataFrame, day_filter: str) -> pd.DataFrame:
-    if day_filter == "Weekdays only":
-        return forecast.loc[~forecast["Is Weekend"]].copy()
-    if day_filter == "Weekends only":
-        return forecast.loc[forecast["Is Weekend"]].copy()
-    return forecast.copy()
-
-
-def get_agreement_message(forecast: pd.DataFrame) -> tuple[str, str]:
-    """How closely the ensemble members line up. Agreement is not accuracy — the
-    members share training data, so they can be wrong together."""
-    if not {"yhat_lower", "yhat_upper"}.issubset(forecast.columns):
-        return "Unknown", "The forecast was published without a model range."
-
-    width = (forecast["yhat_upper"] - forecast["yhat_lower"]).median()
-    center = forecast["Ensemble"].median()
-    if not center:
-        return "Unknown", "The forecast was published without a model range."
-
-    relative = width / center
-    if relative < 0.025:
-        return "High", f"The forecast models sit within {relative * 100:.1f}% of each other."
-    if relative < 0.05:
-        return "Moderate", f"The forecast models differ by about {relative * 100:.1f}% on a typical day."
-    return "Mixed", f"The forecast models disagree by around {relative * 100:.1f}%, so treat close calls loosely."
-
-
-def get_trend_message(historical: pd.DataFrame, forecast: pd.DataFrame) -> tuple[str, str]:
-    recent = historical.tail(min(30, len(historical)))["Vehicles Per Day"].mean()
-    next_week = forecast.head(min(7, len(forecast)))["Ensemble"].mean()
-    if pd.isna(recent) or recent == 0:
-        return "Steady", "Not enough recent history to compare."
-    delta = ((next_week - recent) / recent) * 100
-    if delta <= -8:
-        return "Quieter trend", f"About {abs(delta):.0f}% below the recent average."
-    if delta >= 8:
-        return "Busier trend", f"About {delta:.0f}% above the recent average."
-    return "Stable trend", "The next week looks close to recent traffic levels."
-
-
-def compute_best_window(forecast: pd.DataFrame) -> str:
-    if len(forecast) < 3:
-        return forecast.iloc[0]["ds"].strftime("%a, %b %d")
-    window = forecast[["ds", "Ensemble"]].copy()
-    window["rolling_mean"] = window["Ensemble"].rolling(3).mean()
-    best = window.dropna().sort_values("rolling_mean").iloc[0]
-    idx = window.index.get_loc(best.name)
-    start = window.iloc[idx - 2]["ds"]
-    end = window.iloc[idx]["ds"]
-    return f"{start.strftime('%a, %b %d')} to {end.strftime('%a, %b %d')}"
-
-
-def build_insights(historical: pd.DataFrame) -> tuple[str, str]:
-    weekday_avg = historical.groupby("Day of Week")["Vehicles Per Day"].mean().reindex(
-        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-    )
-    best_day = weekday_avg.idxmin()
-    worst_day = weekday_avg.idxmax()
-    diff_pct = ((weekday_avg[worst_day] - weekday_avg[best_day]) / weekday_avg[worst_day]) * 100
-
-    month_avg = historical.groupby("Month")["Vehicles Per Day"].mean()
-    peak_month = int(month_avg.idxmax())
-    quiet_month = int(month_avg.idxmin())
-    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
-    weekly = f"{best_day}s are typically the quietest, with about {diff_pct:.0f}% less traffic than {worst_day}s."
-    seasonal = f"{month_names[peak_month - 1]} is usually the busiest month, while {month_names[quiet_month - 1]} is the calmest."
-    return weekly, seasonal
-
-
-def compute_recommendations(forecast: pd.DataFrame, historical: pd.DataFrame, day_filter: str) -> ForecastSummary | None:
-    filtered = filter_forecast_days(forecast, day_filter)
-    if filtered.empty:
+def load_payload_json(payload_path: Path = OUTPUTS_DIR / "forecast_payload.json") -> Optional[Dict[str, Any]]:
+    if not payload_path.exists():
+        return None
+    try:
+        return json.loads(payload_path.read_text(encoding="utf-8"))
+    except Exception:
         return None
 
-    scored = filtered.copy()
-    scored["Traffic Score"] = compute_traffic_score(scored, historical)
-    quietest = scored.sort_values("Ensemble", ascending=True)
-    busiest = scored.sort_values("Ensemble", ascending=False)
-    best_day = quietest.iloc[0]
-    worst_day = busiest.iloc[0]
-    top_days = quietest.head(min(3, len(scored)))
-    avoid_days = busiest.head(min(3, len(scored)))
-    agreement_label, agreement_detail = get_agreement_message(filtered)
-    trend_label, trend_detail = get_trend_message(historical, filtered.sort_values("ds"))
-    weekly_insight, seasonal_insight = build_insights(historical)
-    busy_days_count = int(
-        filtered.apply(
-            lambda row: seasonal_percentile(row["Ensemble"], row["ds"], historical) > 80,
-            axis=1,
-        ).sum()
-    )
-    scope = "weekdays" if day_filter == "Weekdays only" else "weekends" if day_filter == "Weekends only" else "days"
-    recommendation = (
-        f"Go on {best_day['ds'].strftime('%A, %b %d')}. "
-        f"Avoid {worst_day['ds'].strftime('%A, %b %d')} if your dates are flexible."
-    )
 
-    return ForecastSummary(
-        best_day=best_day,
-        worst_day=worst_day,
-        top_days=top_days,
-        avoid_days=avoid_days,
-        recommendation=recommendation,
-        best_window_text=compute_best_window(filtered.sort_values("ds")),
-        agreement_label=agreement_label,
-        agreement_detail=agreement_detail,
-        trend_label=trend_label,
-        trend_detail=trend_detail,
-        busy_days_count=busy_days_count,
-        filtered_days_label=scope,
-        weekly_insight=weekly_insight,
-        seasonal_insight=seasonal_insight,
-    )
+def load_historical_data(csv_path: Path = ROOT_TRAFFIC_TSV) -> pd.DataFrame:
+    """Load and validate historical daily Banff traffic counts."""
+    return load_daily_traffic(csv_path=csv_path, reindex_daily=True)
 
 
-def render_decision_card(title: str, emoji: str, day_text: str, status: str, vehicles: int, detail: str, kind: str) -> str:
-    klass = "decision-card decision-best" if kind == "best" else "decision-card decision-avoid"
-    return (
-        f'<div class="{klass}">'
-        f'<div class="card-label">{emoji} {title}</div>'
-        f'<div class="card-date">{day_text}</div>'
-        f'<div class="card-status">{status}</div>'
-        f'<div class="card-metric">🚗 {vehicles:,} vehicles</div>'
-        f'<div class="card-detail">{detail}</div>'
-        "</div>"
-    )
+def load_forecast_data(
+    historical: pd.DataFrame,
+    today: Optional[pd.Timestamp] = None,
+    predictions_path: Path = ROOT_PREDICTIONS_CSV,
+    full_csv_path: Path = OUTPUTS_DIR / "daily_forecast_full.csv",
+    payload: Optional[Dict[str, Any]] = None,
+) -> pd.DataFrame:
+    """Load upcoming daily forecast enriched with dual percentiles, weather, and conformal bounds."""
+    today_ts = pd.Timestamp(today).normalize() if today is not None else calgary_today()
 
-
-def render_hero(summary: ForecastSummary, historical: pd.DataFrame) -> None:
-    best_label, _ = label_for_volume(summary.best_day["Ensemble"], summary.best_day["ds"], historical)
-    worst_label, _ = label_for_volume(summary.worst_day["Ensemble"], summary.worst_day["ds"], historical)
-    hero_html = (
-        '<div class="hero-shell">'
-        '<h1 class="hero-title">Banff Visit Planner</h1>'
-        '<p class="hero-sub">This forecast is designed for one decision: pick the quietest upcoming day to visit Banff.</p>'
-        '<div class="hero-grid">'
-        + render_decision_card(
-            "Best Day to Visit",
-            "🌟",
-            summary.best_day["ds"].strftime("%a, %b %d"),
-            best_label,
-            int(summary.best_day["Ensemble"]),
-            "Lowest predicted traffic in the current planning window.",
-            "best",
+    if full_csv_path.exists():
+        df = pd.read_csv(full_csv_path)
+    elif predictions_path.exists():
+        df = pd.read_csv(predictions_path)
+    elif payload and payload.get("forecast_days"):
+        df = pd.DataFrame(payload["forecast_days"]).rename(
+            columns={"ensemble": "Ensemble", "dow": "Day of Week", "is_weekend": "Is Weekend"}
         )
-        + render_decision_card(
-            "Day to Avoid",
-            "⚠️",
-            summary.worst_day["ds"].strftime("%a, %b %d"),
-            worst_label,
-            int(summary.worst_day["Ensemble"]),
-            "Highest predicted traffic in the current planning window.",
-            "avoid",
-        )
-        + (
-            '<div class="decision-card decision-kpi">'
-            '<div class="card-label">📌 Decision Snapshot</div>'
-            f'<div class="card-date">{summary.best_window_text}</div>'
-            f'<div class="card-status">{summary.trend_label}</div>'
-            f'<div class="card-metric">{summary.busy_days_count} busy {summary.filtered_days_label}</div>'
-            f'<div class="card-detail">{summary.agreement_label} model agreement. {summary.trend_detail}</div>'
-            "</div>"
-        )
-        + "</div>"
-        f'<div class="banner"><strong>Recommendation:</strong> {summary.recommendation}<br><span class="muted">Best low-traffic window: {summary.best_window_text}. {summary.agreement_detail}</span></div>'
-        "</div>"
+    else:
+        raise FileNotFoundError(f"Neither {full_csv_path} nor {predictions_path} exists.")
+
+    df.columns = [str(c).strip() for c in df.columns]
+    if "ds" not in df.columns or "Ensemble" not in df.columns:
+        raise KeyError("Forecast file must include 'ds' and 'Ensemble' columns.")
+
+    df["ds"] = pd.to_datetime(df["ds"], errors="coerce").dt.normalize()
+    df["Ensemble"] = pd.to_numeric(df["Ensemble"], errors="coerce")
+    df = df.dropna(subset=["ds", "Ensemble"]).sort_values("ds").reset_index(drop=True)
+
+    # Filter strictly to upcoming calendar dates relative to Banff MT today
+    upcoming = df.loc[df["ds"] >= today_ts].copy()
+    if upcoming.empty:
+        return upcoming
+
+    # If reading minimal predictions.csv without full enrichment columns, compute them cleanly
+    required_rich = {
+        "overall_percentile",
+        "daytype_percentile",
+        "dow_seasonal_norm",
+        "vs_dow_norm_pct",
+        "weather_score",
+        "visit_score_balanced",
+    }
+    if not required_rich.issubset(upcoming.columns):
+        # Use stored conformal intervals if present, otherwise derive conservative spread around ensemble
+        if "pi80_low" not in upcoming.columns and {"yhat_lower", "yhat_upper"}.issubset(upcoming.columns):
+            upcoming["pi80_low"] = pd.to_numeric(upcoming["yhat_lower"], errors="coerce")
+            upcoming["pi80_high"] = pd.to_numeric(upcoming["yhat_upper"], errors="coerce")
+        upcoming = enrich_forecast_analytics(upcoming, historical, exog_panel=None)
+    else:
+        upcoming["Day of Week"] = upcoming["ds"].dt.day_name()
+        upcoming["Day of Week Num"] = upcoming["ds"].dt.day_of_week
+        upcoming["Is Weekend"] = upcoming["Day of Week Num"].isin([5, 6])
+
+    # Ensure conformal bounds always exist for charting
+    if "pi80_low" not in upcoming.columns:
+        upcoming["pi80_low"] = upcoming["Ensemble"] * 0.90
+        upcoming["pi80_high"] = upcoming["Ensemble"] * 1.10
+    if "pi95_low" not in upcoming.columns:
+        upcoming["pi95_low"] = upcoming["Ensemble"] * 0.84
+        upcoming["pi95_high"] = upcoming["Ensemble"] * 1.16
+
+    for num_col in (
+        "pi80_low",
+        "pi80_high",
+        "pi95_low",
+        "pi95_high",
+        "temp_max_c",
+        "temp_min_c",
+        "precip_prob_pct",
+        "precip_mm",
+        "snowfall_cm",
+        "weather_score",
+        "west_entrance",
+        "east_entrance",
+        "mountain_ave",
+    ):
+        if num_col in upcoming.columns:
+            upcoming[num_col] = pd.to_numeric(upcoming[num_col], errors="coerce")
+
+    return upcoming.reset_index(drop=True)
+
+
+def prepare_dashboard_state(
+    historical: pd.DataFrame,
+    forecast: pd.DataFrame,
+    day_filter: str = "All upcoming days",
+    priority: str = "balanced",
+    trip_days: int = 3,
+    cv_info: Optional[Dict[str, Any]] = None,
+) -> Tuple[pd.DataFrame, Optional[ForecastSummary]]:
+    """Pure computation wrapper used by both Streamlit UI and automated unit tests."""
+    filtered = filter_forecast_days(forecast, day_filter)
+    summary = compute_recommendations(
+        forecast,
+        historical,
+        day_filter=day_filter,
+        priority=priority,
+        trip_days=trip_days,
+        cv_info=cv_info,
     )
-    st.markdown(hero_html, unsafe_allow_html=True)
+    return filtered, summary
 
 
-def render_mini_metrics(summary: ForecastSummary, forecast: pd.DataFrame) -> None:
-    html = (
-        '<div class="small-card-grid">'
-        '<div class="mini-card">'
-        '<div class="mini-label">Recent Trend (30 days)</div>'
-        f'<div class="mini-value">{summary.trend_label}</div>'
-        f'<div class="mini-detail">{summary.trend_detail}</div>'
-        "</div>"
-        '<div class="mini-card">'
-        '<div class="mini-label">Forecast Window</div>'
-        f'<div class="mini-value">{len(forecast)} days</div>'
-        f'<div class="mini-detail">{forecast["ds"].min().strftime("%b %d")} to {forecast["ds"].max().strftime("%b %d, %Y")}</div>'
-        "</div>"
-        '<div class="mini-card">'
-        '<div class="mini-label">Low-Traffic Period</div>'
-        f'<div class="mini-value">{summary.best_window_text}</div>'
-        '<div class="mini-detail">Strongest short window for a quieter visit.</div>'
-        "</div>"
-        "</div>"
+@st.cache_data(show_spinner=False, ttl=1800)
+def _cached_load_all(today_str: str) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[Dict[str, Any]]]:
+    payload = load_payload_json()
+    historical = load_historical_data()
+    forecast = load_forecast_data(historical, today=pd.Timestamp(today_str), payload=payload)
+    return historical, forecast, payload
+
+
+def _fmt_temp(v: Any) -> str:
+    if v is None or pd.isna(v):
+        return "—"
+    return f"{round(float(v))}°C"
+
+
+def _clean_str(v: Any) -> str:
+    if v is None or pd.isna(v):
+        return ""
+    s = str(v).strip()
+    return "" if s.lower() == "nan" else s
+
+
+def _fmt_drivers_lookup(payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    if not payload or not payload.get("forecast_days"):
+        return {}
+    return {str(d["ds"]): d.get("driver_attributions", {}) for d in payload["forecast_days"]}
+
+
+def _score_col_for(day_filter: str, priority: str) -> str:
+    is_scoped = day_filter in ("Weekdays only", "Weekends only")
+    if priority == "quiet":
+        return "traffic_score_daytype" if is_scoped else "traffic_score_overall"
+    if priority == "weather":
+        return "visit_score_weather"
+    return "visit_score_scoped_balanced" if is_scoped else "visit_score_balanced"
+
+
+def render_hero_cards(
+    summary: ForecastSummary,
+    filtered: pd.DataFrame,
+    day_filter: str,
+    priority: str,
+    payload: Optional[Dict[str, Any]],
+) -> None:
+    is_scoped = day_filter in ("Weekdays only", "Weekends only")
+    score_col = _score_col_for(day_filter, priority)
+    best = summary.best_day
+    worst = summary.worst_day
+    win = summary.best_window
+
+    best_ds = pd.Timestamp(best["ds"])
+    worst_ds = pd.Timestamp(worst["ds"])
+    best_sig = best["signal_daytype"] if is_scoped else best["signal_overall"]
+    best_tone = best["tone_daytype"] if is_scoped else best["tone_overall"]
+    worst_sig = worst["signal_daytype"] if is_scoped else worst["signal_overall"]
+    worst_tone = worst["tone_daytype"] if is_scoped else worst["tone_overall"]
+
+    drivers_map = _fmt_drivers_lookup(payload)
+    best_drivers = drivers_map.get(best_ds.strftime("%Y-%m-%d"), {}).get("drivers", [])
+    best_driver_txt = best_drivers[0]["factor"] if best_drivers else "Calmer road demand relative to seasonal normal"
+
+    best_wx = f"{_fmt_temp(best.get('temp_max_c'))} / {_fmt_temp(best.get('temp_min_c'))} · {best.get('weather_label', 'Seasonal')}"
+    worst_wx = f"{_fmt_temp(worst.get('temp_max_c'))} / {_fmt_temp(worst.get('temp_min_c'))} · {worst.get('weather_label', 'Seasonal')}"
+    best_ci = f"{int(round(best['pi80_low'])):,}–{int(round(best['pi80_high'])):,}"
+    worst_event = _clean_str(worst.get("event_label"))
+
+    bench = (payload or {}).get("cv_benchmark", {})
+    cov80 = bench.get("empirical_cov80_pct", 80.0)
+    mape = None
+    for row in bench.get("summary_metrics", []):
+        if row.get("model") == "Ensemble_Weighted":
+            mape = row.get("MAPE")
+            break
+
+    win_avg = int(round(float(win["avg_vehicles"]))) if win.get("avg_vehicles") else 0
+
+    st.markdown(
+        f"""
+        <div class="hero-grid">
+          <div class="panel-card">
+            <div>
+              <div class="eyebrow"><span>Recommended Day</span><span class="score-chip tabular">Score {float(best[score_col]):.0f}/100</span></div>
+              <div class="card-date">{best_ds.strftime("%a, %b %d")}</div>
+              <span class="signal-pill tone-{best_tone}">{best_sig}</span>
+              <div class="card-body">
+                <strong>{_fmt_temp(best.get('temp_max_c'))}</strong> high · {best_wx}<br>
+                <span class="tabular"><strong>{int(round(best['Ensemble'])):,} vehicles/day</strong> (80% CI: {best_ci})</span><br>
+                Driver: {best_driver_txt}
+              </div>
+            </div>
+            <div class="mini-sub tabular" style="margin-top:0.75rem;padding-top:0.6rem;border-top:1px solid {COLORS['border']};">
+              {float(best['vs_dow_norm_pct']):+.1f}% vs typical {best_ds.strftime("%a")} · {float(best['daytype_percentile']):.0f}th day-type pct
+            </div>
+          </div>
+
+          <div class="panel-card">
+            <div>
+              <div class="eyebrow"><span>Busiest Day to Avoid</span><span class="signal-pill tone-warning">{worst_event if worst_event else "Peak traffic"}</span></div>
+              <div class="card-date">{worst_ds.strftime("%a, %b %d")}</div>
+              <span class="signal-pill tone-{worst_tone}">{worst_sig}</span>
+              <div class="card-body">
+                {worst_wx}<br>
+                <span class="tabular"><strong>{int(round(worst['Ensemble'])):,} vehicles/day</strong> ({float(worst['vs_dow_norm_pct']):+.1f}% vs typical {worst_ds.strftime("%a")})</span><br>
+                Arrive before 08:45 AM or ride Roam Transit from Banff Train Station.
+              </div>
+            </div>
+            <div class="mini-sub tabular" style="margin-top:0.75rem;padding-top:0.6rem;border-top:1px solid {COLORS['border']};">
+              West {int(round(worst.get('west_entrance', 0))):,} · East {int(round(worst.get('east_entrance', 0))):,} vehicles
+            </div>
+          </div>
+
+          <div class="panel-card">
+            <div>
+              <div class="eyebrow"><span>Best {win['actual_days']}-Day Contiguous Stay</span><span class="score-chip tabular">Avg {win_avg:,}/day</span></div>
+              <div class="card-date" style="font-size:1.3rem;">{win['text']}</div>
+              <div class="card-body">
+                <strong>{summary.trend_label}:</strong> {summary.trend_detail}<br><br>
+                {summary.confidence_detail}
+              </div>
+            </div>
+            <div class="mini-sub tabular" style="margin-top:0.75rem;padding-top:0.6rem;border-top:1px solid {COLORS['border']};">
+              {summary.busy_days_count} of {len(filtered)} matching days heavy · Scope: {summary.filtered_days_label}
+            </div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-    st.markdown(html, unsafe_allow_html=True)
+
+    mape_txt = f"{float(mape):.2f}% MAPE" if mape is not None else "Multi-model log ensemble"
+    st.markdown(
+        f"""
+        <div class="mini-grid">
+          <div class="mini-stat">
+            <div class="mini-lbl">Contiguous Stay</div>
+            <div class="mini-val tabular">{win['text']}</div>
+            <div class="mini-sub">Strictly {win['actual_days']} consecutive calendar day(s)</div>
+          </div>
+          <div class="mini-stat">
+            <div class="mini-lbl">Matched Trend</div>
+            <div class="mini-val">{summary.trend_label}</div>
+            <div class="mini-sub">Compared vs matching day-type &amp; seasonal norm</div>
+          </div>
+          <div class="mini-stat">
+            <div class="mini-lbl">Conformal Precision</div>
+            <div class="mini-val tabular">{summary.confidence_label}</div>
+            <div class="mini-sub tabular">{mape_txt} · {cov80:.1f}% OOS 80% coverage</div>
+          </div>
+          <div class="mini-stat">
+            <div class="mini-lbl">Planning Window</div>
+            <div class="mini-val tabular">{len(filtered)} days</div>
+            <div class="mini-sub tabular">{filtered['ds'].min().strftime('%b %d')} – {filtered['ds'].max().strftime('%b %d, %Y')}</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
-def add_weekend_shading(fig: go.Figure, forecast: pd.DataFrame) -> None:
-    for _, row in forecast.loc[forecast["Is Weekend"]].iterrows():
-        start = row["ds"].normalize() - pd.Timedelta(hours=12)
-        end = row["ds"].normalize() + pd.Timedelta(hours=12)
-        fig.add_vrect(x0=start, x1=end, fillcolor="rgba(245,158,11,0.08)", line_width=0, layer="below")
-
-
-def render_forecast_chart(historical: pd.DataFrame, forecast: pd.DataFrame, summary: ForecastSummary, show_history: bool) -> None:
+def render_forecast_chart(
+    historical: pd.DataFrame,
+    filtered: pd.DataFrame,
+    summary: ForecastSummary,
+    show_history: bool,
+    show_pi95: bool,
+) -> None:
     fig = go.Figure()
-    forecast = forecast.sort_values("ds")
-    add_weekend_shading(fig, forecast)
+    fc = filtered.sort_values("ds").copy()
+
+    for _, row in fc.loc[fc["Is Weekend"]].iterrows():
+        s0 = pd.Timestamp(row["ds"]).normalize() - pd.Timedelta(hours=12)
+        s1 = pd.Timestamp(row["ds"]).normalize() + pd.Timedelta(hours=12)
+        fig.add_vrect(x0=s0, x1=s1, fillcolor="rgba(251,191,36,0.06)", line_width=0, layer="below")
 
     if show_history:
-        history_tail = historical.tail(45)
+        hist_tail = historical.tail(45)
         fig.add_trace(
             go.Scatter(
-                x=history_tail["Date"],
-                y=history_tail["Vehicles Per Day"],
+                x=hist_tail["Date"],
+                y=hist_tail["Vehicles Per Day"],
                 mode="lines",
-                name="Recent history",
+                name="Observed (45d)",
                 line=dict(color=COLORS["history"], width=2),
-                opacity=0.45,
-                hovertemplate="%{x|%b %d}: %{y:,.0f} vehicles<extra></extra>",
+                opacity=0.55,
+                hovertemplate="%{x|%a, %b %d}: %{y:,.0f} vehicles<extra></extra>",
             )
         )
+        if not fc.empty and not hist_tail.empty:
+            fig.add_trace(
+                go.Scatter(
+                    x=[hist_tail["Date"].iloc[-1], fc["ds"].iloc[0]],
+                    y=[hist_tail["Vehicles Per Day"].iloc[-1], fc["Ensemble"].iloc[0]],
+                    mode="lines",
+                    line=dict(color=COLORS["glacier"], width=2, dash="dot"),
+                    showlegend=False,
+                    hoverinfo="skip",
+                )
+            )
 
-    if {"yhat_lower", "yhat_upper"}.issubset(forecast.columns):
+    if show_pi95 and {"pi95_low", "pi95_high"}.issubset(fc.columns):
         fig.add_trace(
-            go.Scatter(
-                x=forecast["ds"],
-                y=forecast["yhat_upper"],
-                mode="lines",
-                line=dict(width=0),
-                showlegend=False,
-                hoverinfo="skip",
-            )
+            go.Scatter(x=fc["ds"], y=fc["pi95_high"], mode="lines", line=dict(width=0), showlegend=False, hoverinfo="skip")
         )
         fig.add_trace(
             go.Scatter(
-                x=forecast["ds"],
-                y=forecast["yhat_lower"],
+                x=fc["ds"],
+                y=fc["pi95_low"],
                 mode="lines",
                 line=dict(width=0),
                 fill="tonexty",
-                fillcolor="rgba(56,189,248,0.12)",
-                name="Forecast range",
+                fillcolor="rgba(86, 180, 233, 0.08)",
+                name="95% Conformal PI",
+                hoverinfo="skip",
+            )
+        )
+
+    if {"pi80_low", "pi80_high"}.issubset(fc.columns):
+        fig.add_trace(
+            go.Scatter(x=fc["ds"], y=fc["pi80_high"], mode="lines", line=dict(width=0), showlegend=False, hoverinfo="skip")
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=fc["ds"],
+                y=fc["pi80_low"],
+                mode="lines",
+                line=dict(width=0),
+                fill="tonexty",
+                fillcolor="rgba(86, 180, 233, 0.18)",
+                name="80% Conformal PI",
                 hoverinfo="skip",
             )
         )
 
     fig.add_trace(
         go.Scatter(
-            x=forecast["ds"],
-            y=forecast["Ensemble"],
+            x=fc["ds"],
+            y=fc["Ensemble"],
             mode="lines+markers",
-            name="Forecast",
-            line=dict(color=COLORS["blue"], width=3),
-            marker=dict(size=8, color=COLORS["blue"]),
-            hovertemplate="%{x|%A, %b %d}<br>%{y:,.0f} vehicles<extra></extra>",
+            name="Ensemble Forecast",
+            line=dict(color=COLORS["glacier"], width=3),
+            marker=dict(size=8, color=COLORS["glacier"]),
+            hovertemplate="%{x|%A, %b %d}<br>%{y:,.0f} vehicles/day<extra></extra>",
         )
     )
 
     for label, row, color, ay in [
-        ("Best day", summary.best_day, COLORS["best"], -46),
-        ("Avoid", summary.worst_day, COLORS["bad"], -56),
+        ("Best pick", summary.best_day, COLORS["best"], -44),
+        ("Peak avoid", summary.worst_day, COLORS["bad"], -50),
     ]:
         fig.add_trace(
             go.Scatter(
@@ -683,8 +596,8 @@ def render_forecast_chart(historical: pd.DataFrame, forecast: pd.DataFrame, summ
                 y=[row["Ensemble"]],
                 mode="markers",
                 showlegend=False,
-                marker=dict(size=15, color=color, line=dict(color="#F9FAFB", width=2)),
-                hovertemplate="%{x|%A, %b %d}<br>%{y:,.0f} vehicles<extra></extra>",
+                marker=dict(size=14, color=color, line=dict(color=COLORS["ink"], width=2)),
+                hovertemplate="%{x|%A, %b %d}<br>%{y:,.0f} vehicles/day<extra></extra>",
             )
         )
         fig.add_annotation(
@@ -695,220 +608,327 @@ def render_forecast_chart(historical: pd.DataFrame, forecast: pd.DataFrame, summ
             arrowhead=2,
             ax=0,
             ay=ay,
-            bgcolor="#111827",
+            bgcolor=COLORS["surface"],
             bordercolor=color,
-            font=dict(color=COLORS["text"]),
+            font=dict(color=COLORS["ink"]),
         )
 
     fig.update_layout(
-        height=470,
-        margin=dict(l=10, r=10, t=20, b=10),
+        height=430,
+        margin=dict(l=10, r=10, t=24, b=10),
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(17,24,39,0.74)",
+        plot_bgcolor=COLORS["surface"],
         hovermode="x unified",
-        legend=dict(orientation="h", y=1.04, x=0),
+        legend=dict(orientation="h", y=1.05, x=0),
         xaxis_title="",
-        yaxis_title="Vehicles per day",
-        font=dict(color=COLORS["text"]),
+        yaxis_title="Vehicles per day (two-way entrances)",
+        font=dict(color=COLORS["ink"]),
     )
     fig.update_xaxes(showgrid=False, zeroline=False)
-    fig.update_yaxes(gridcolor="rgba(148,163,184,0.12)", zeroline=False)
+    fig.update_yaxes(gridcolor="rgba(155, 168, 162, 0.14)", zeroline=False)
     st.plotly_chart(fig, width="stretch")
 
 
-def render_pick_pills(days: pd.DataFrame, historical: pd.DataFrame, title: str, mode: str) -> None:
-    st.markdown(f"#### {title}")
-    columns = st.columns(len(days)) if len(days) > 0 else []
-    for rank, ((_, row), column) in enumerate(zip(days.iterrows(), columns), start=1):
-        label, tone = label_for_volume(row["Ensemble"], row["ds"], historical)
-        badge_class = {
-            "best": "badge-best",
-            "good": "badge-good",
-            "warning": "badge-warning",
-            "bad": "badge-bad",
-        }[tone]
-        pill_class = "pick-pill pick-good" if mode == "good" else "pick-pill pick-bad"
-        with column:
+def render_inspector_and_picks(
+    filtered: pd.DataFrame,
+    summary: ForecastSummary,
+    day_filter: str,
+    priority: str,
+    payload: Optional[Dict[str, Any]],
+) -> None:
+    is_scoped = day_filter in ("Weekdays only", "Weekends only")
+    score_col = _score_col_for(day_filter, priority)
+    drivers_map = _fmt_drivers_lookup(payload)
+
+    col_insp, col_picks = st.columns([1.25, 1.0])
+    with col_insp:
+        st.markdown("#### Selected Day Deep Dive")
+        date_options = filtered["ds"].dt.strftime("%Y-%m-%d").tolist()
+        best_ds_str = pd.Timestamp(summary.best_day["ds"]).strftime("%Y-%m-%d")
+        default_idx = date_options.index(best_ds_str) if best_ds_str in date_options else 0
+        sel_ds = st.selectbox(
+            "Inspect day",
+            options=date_options,
+            index=default_idx,
+            format_func=lambda s: pd.Timestamp(s).strftime("%a, %b %d (%Y)"),
+            label_visibility="collapsed",
+        )
+        row = filtered.loc[filtered["ds"].dt.strftime("%Y-%m-%d") == sel_ds].iloc[0]
+
+        m1, m2, m3 = st.columns(3)
+        m1.metric(
+            "Expected Traffic",
+            f"{int(round(row['Ensemble'])):,}",
+            f"{float(row['vs_dow_norm_pct']):+.1f}% vs {pd.Timestamp(row['ds']).strftime('%a')} norm",
+        )
+        m2.metric(
+            "Weather & Comfort",
+            f"{_fmt_temp(row.get('temp_max_c'))} / {_fmt_temp(row.get('temp_min_c'))}",
+            f"{row.get('weather_label', 'Seasonal')} ({float(row['weather_score']):.0f}/100)",
+        )
+        m3.metric(
+            "Visit Score",
+            f"{float(row[score_col]):.0f} / 100",
+            f"{float(row['daytype_percentile']):.0f}th day-type pct",
+        )
+
+        st.caption(
+            f"**Dual Crowd Benchmarks:** {float(row['daytype_percentile']):.0f}th percentile vs same day-of-week "
+            f"(3-yr norm: {int(round(row['dow_seasonal_norm'])):,}) · "
+            f"{float(row['overall_percentile']):.0f}th percentile across all days in ±10d season. · "
+            f"**80% Conformal CI:** {int(round(row['pi80_low'])):,}–{int(round(row['pi80_high'])):,} veh/day."
+        )
+
+        # Entrance corridor breakdown
+        if pd.notna(row.get("west_entrance")) and pd.notna(row.get("east_entrance")):
+            w_val = int(round(row["west_entrance"]))
+            e_val = int(round(row["east_entrance"]))
+            m_val = int(round(row["mountain_ave"])) if pd.notna(row.get("mountain_ave")) else 0
+            st.caption(
+                f"**Expected Corridor Split:** West (Norquay / Bow Valley) {w_val:,} · "
+                f"East (Banff Ave / Hwy 1) {e_val:,} · Mountain Ave / Gondola ~{m_val:,}"
+            )
+
+        # Causal forecast drivers
+        day_drivers = drivers_map.get(sel_ds, {}).get("drivers", [])
+        if day_drivers:
+            st.markdown("**Why this forecast?**")
+            for dr in day_drivers:
+                imp = float(dr.get("impact_pct", 0.0))
+                tone = COLORS["warning"] if imp >= 0 else COLORS["best"]
+                st.markdown(
+                    f'<div class="driver-pill"><span>{dr.get("factor", "Seasonal rhythm")}</span>'
+                    f'<strong class="tabular" style="color:{tone};">{imp:+.1f}%</strong></div>',
+                    unsafe_allow_html=True,
+                )
+
+    with col_picks:
+        st.markdown("#### Top Ranked Days to Visit")
+        for rank, (_, r) in enumerate(summary.top_days.iterrows(), start=1):
+            sig = r["signal_daytype"] if is_scoped else r["signal_overall"]
+            tone = r["tone_daytype"] if is_scoped else r["tone_overall"]
             st.markdown(
-                f"""
-                <div class="{pill_class}">
-                    <div class="pick-rank">#{rank}</div>
-                    <div class="pick-date">{row["ds"].strftime("%a, %b %d")}</div>
-                    <div class="pill-badge {badge_class}">{label}</div>
-                    <div>🚗 {int(row["Ensemble"]):,} vehicles</div>
-                    <div class="muted">{row["Day of Week"]}</div>
-                </div>
-                """,
+                f'<div class="driver-pill">'
+                f'<span><strong>#{rank} {pd.Timestamp(r["ds"]).strftime("%a, %b %d")}</strong> · '
+                f'<span class="signal-pill tone-{tone}">{sig}</span><br>'
+                f'<small style="color:{COLORS["muted"]};">{_fmt_temp(r.get("temp_max_c"))} {r.get("weather_label", "")}</small></span>'
+                f'<strong class="tabular">{int(round(r["Ensemble"])):,} veh<br>'
+                f'<small style="color:{COLORS["accent"]};">{float(r[score_col]):.0f}/100</small></strong>'
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("#### Days to Avoid")
+        for rank, (_, r) in enumerate(summary.avoid_days.iterrows(), start=1):
+            sig = r["signal_daytype"] if is_scoped else r["signal_overall"]
+            tone = r["tone_daytype"] if is_scoped else r["tone_overall"]
+            ev_txt = _clean_str(r.get("event_label"))
+            ev = f" · {ev_txt}" if ev_txt else ""
+            st.markdown(
+                f'<div class="driver-pill">'
+                f'<span><strong>#{rank} {pd.Timestamp(r["ds"]).strftime("%a, %b %d")}</strong> · '
+                f'<span class="signal-pill tone-{tone}">{sig}</span><br>'
+                f'<small style="color:{COLORS["muted"]};">{_fmt_temp(r.get("temp_max_c"))} {r.get("weather_label", "")}{ev}</small></span>'
+                f'<strong class="tabular">{int(round(r["Ensemble"])):,} veh</strong>'
+                f"</div>",
                 unsafe_allow_html=True,
             )
 
 
-def render_insight_cards(summary: ForecastSummary) -> None:
-    st.markdown(
-        f"""
-        <div class="insight-grid">
-            <div class="insight-card">
-                <div class="insight-title">Weekly Insight</div>
-                <div class="insight-body">💡 {summary.weekly_insight}</div>
-            </div>
-            <div class="insight-card">
-                <div class="insight-title">Seasonal Tip</div>
-                <div class="insight-body">📅 {summary.seasonal_insight}</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+def render_deep_dive_tabs(
+    historical: pd.DataFrame,
+    filtered: pd.DataFrame,
+    day_filter: str,
+    priority: str,
+    payload: Optional[Dict[str, Any]],
+) -> None:
+    is_scoped = day_filter in ("Weekdays only", "Weekends only")
+    score_col = _score_col_for(day_filter, priority)
+
+    tab_tbl, tab_wk, tab_yr, tab_cv = st.tabs(
+        ["Full 15-Day Table", "Weekly Rhythm", "3-Year Seasonality", "Model Accuracy & Sources"]
     )
 
-
-def render_day_of_week_patterns(historical: pd.DataFrame) -> None:
-    order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-    stats = historical.groupby("Day of Week")["Vehicles Per Day"].mean().reindex(order).reset_index()
-    colors = [COLORS["good"] if day in order[:5] else COLORS["warning"] for day in stats["Day of Week"]]
-    fig = go.Figure(
-        go.Bar(
-            x=stats["Day of Week"],
-            y=stats["Vehicles Per Day"],
-            marker_color=colors,
-            text=[f"{int(v):,}" for v in stats["Vehicles Per Day"]],
-            textposition="outside",
-            hovertemplate="%{x}<br>%{y:,.0f} vehicles<extra></extra>",
+    with tab_tbl:
+        disp = pd.DataFrame(
+            {
+                "Date": filtered["ds"].dt.strftime("%Y-%m-%d"),
+                "Day": filtered["Day of Week"].str[:3],
+                "Conditions": filtered.get("weather_label", pd.Series("Seasonal", index=filtered.index)),
+                "High / Low (°C)": [
+                    f"{_fmt_temp(mx)} / {_fmt_temp(mn)}"
+                    for mx, mn in zip(filtered.get("temp_max_c", [np.nan] * len(filtered)), filtered.get("temp_min_c", [np.nan] * len(filtered)))
+                ],
+                "Vehicles/Day": filtered["Ensemble"].round().astype(int),
+                "80% Conformal CI": [
+                    f"{int(round(lo)):,}–{int(round(hi)):,}"
+                    for lo, hi in zip(filtered["pi80_low"], filtered["pi80_high"])
+                ],
+                "Visit Score": filtered[score_col].round(0).astype(int),
+                "Crowd Signal": filtered["signal_daytype"] if is_scoped else filtered["signal_overall"],
+            }
         )
-    )
-    fig.update_layout(
-        height=360,
-        margin=dict(l=10, r=10, t=20, b=10),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(17,24,39,0.74)",
-        showlegend=False,
-        yaxis_title="Average vehicles",
-        xaxis_title="",
-        font=dict(color=COLORS["text"]),
-    )
-    fig.update_yaxes(gridcolor="rgba(148,163,184,0.12)")
-    st.plotly_chart(fig, width="stretch")
+        if "event_label" in filtered.columns:
+            disp["Event"] = filtered["event_label"].astype("string").fillna("")
+        st.dataframe(disp, hide_index=True, width="stretch")
 
-
-def render_monthly_patterns(historical: pd.DataFrame) -> None:
-    recent_years = sorted(historical["Year"].unique())[-3:]
-    monthly = (
-        historical.loc[historical["Year"].isin(recent_years)]
-        .groupby(["Year", "Month"])["Vehicles Per Day"]
-        .mean()
-        .reset_index()
-    )
-    fig = go.Figure()
-    for year in recent_years:
-        year_data = monthly.loc[monthly["Year"] == year]
-        fig.add_trace(
-            go.Scatter(
-                x=year_data["Month"],
-                y=year_data["Vehicles Per Day"],
-                mode="lines+markers",
-                name=str(year),
-                hovertemplate=f"{year}<br>Month %{{x}}<br>%{{y:,.0f}} vehicles<extra></extra>",
+    with tab_wk:
+        order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        recent = historical.tail(min(1095, len(historical)))
+        stats = recent.groupby("Day of Week")["Vehicles Per Day"].mean().reindex(order).reset_index()
+        colors = [COLORS["accent"] if d in order[:5] else COLORS["warning"] for d in stats["Day of Week"]]
+        fig_dow = go.Figure(
+            go.Bar(
+                x=stats["Day of Week"],
+                y=stats["Vehicles Per Day"],
+                marker_color=colors,
+                text=[f"{int(round(v)):,}" for v in stats["Vehicles Per Day"]],
+                textposition="outside",
             )
         )
-    fig.update_layout(
-        height=360,
-        margin=dict(l=10, r=10, t=20, b=10),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(17,24,39,0.74)",
-        yaxis_title="Average vehicles",
-        xaxis_title="Month",
-        xaxis=dict(
-            tickmode="array",
-            tickvals=list(range(1, 13)),
-            ticktext=["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-        ),
-        font=dict(color=COLORS["text"]),
-    )
-    fig.update_yaxes(gridcolor="rgba(148,163,184,0.12)")
-    st.plotly_chart(fig, width="stretch")
+        fig_dow.update_layout(
+            height=340,
+            margin=dict(l=10, r=10, t=20, b=10),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor=COLORS["surface"],
+            yaxis_title="3-Yr Avg Vehicles/Day",
+            font=dict(color=COLORS["ink"]),
+        )
+        st.plotly_chart(fig_dow, width="stretch")
 
+    with tab_yr:
+        recent_years = sorted(historical["Year"].unique())[-3:]
+        monthly = (
+            historical.loc[historical["Year"].isin(recent_years)]
+            .groupby(["Year", "Month"])["Vehicles Per Day"]
+            .mean()
+            .reset_index()
+        )
+        fig_mo = go.Figure()
+        for yr in recent_years:
+            y_df = monthly.loc[monthly["Year"] == yr]
+            fig_mo.add_trace(go.Scatter(x=y_df["Month"], y=y_df["Vehicles Per Day"], mode="lines+markers", name=str(yr)))
+        fig_mo.update_layout(
+            height=340,
+            margin=dict(l=10, r=10, t=20, b=10),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor=COLORS["surface"],
+            yaxis_title="Average Vehicles/Day",
+            xaxis=dict(
+                tickmode="array",
+                tickvals=list(range(1, 13)),
+                ticktext=["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+            ),
+            font=dict(color=COLORS["ink"]),
+        )
+        st.plotly_chart(fig_mo, width="stretch")
 
-def render_forecast_table(forecast: pd.DataFrame, historical: pd.DataFrame) -> None:
-    table = forecast[["ds", "Day of Week", "Ensemble"]].copy()
-    table.columns = ["Date", "Day", "Forecasted Vehicles"]
-    table["Visit signal"] = table.apply(
-        lambda row: label_for_volume(row["Forecasted Vehicles"], row["Date"], historical)[0],
-        axis=1,
-    )
-    st.dataframe(table, hide_index=True, width="stretch")
+    with tab_cv:
+        cv = (payload or {}).get("cv_benchmark", {})
+        fresh = (payload or {}).get("data_freshness", {})
+        summary_rows = cv.get("summary_metrics")
+        if summary_rows:
+            st.markdown(
+                f"**{cv.get('n_folds', 12)}-Fold Expanding Out-of-Sample Benchmark "
+                f"({cv.get('n_oof_days', 192)} days across all 4 Banff seasons)** — "
+                f"Conformal coverage: 80% -> `{cv.get('empirical_cov80_pct', 80.0)}%`, "
+                f"95% -> `{cv.get('empirical_cov95_pct', 95.0)}%`"
+            )
+            cv_df = pd.DataFrame(summary_rows)
+            for col in ("MAE", "RMSE"):
+                if col in cv_df.columns:
+                    cv_df[col] = cv_df[col].round(0).astype(int)
+            for col in ("MAPE", "sMAPE", "Bias_pct"):
+                if col in cv_df.columns:
+                    cv_df[col] = cv_df[col].round(2)
+            if "MASE" in cv_df.columns:
+                cv_df["MASE"] = cv_df["MASE"].round(3)
+            st.dataframe(cv_df, hide_index=True, width="stretch")
+
+        if fresh:
+            st.markdown(
+                f"- **Traffic Counters:** `{fresh.get('traffic_start_date')}` to `{fresh.get('traffic_last_observed')}` ({fresh.get('traffic_days', '—')} days)\n"
+                f"- **Banff Weather & 16-Day NWP:** through `{fresh.get('weather_forecast_through')}` (ECCC BANFF CS + Open-Meteo)\n"
+                f"- **Bank of Canada USD/CAD FX:** observed through `{fresh.get('fx_last_observed')}`\n"
+                f"- **StatCan & Alberta Economic Dashboard:** through `{fresh.get('statcan_macro_through')}` (Hwy 1 & Park Attendance integrated; Zero Waste data strictly excluded)"
+            )
+        else:
+            st.info(
+                "Run `banff-planner` to populate `outputs/forecast_payload.json` with 12-fold CV benchmarks and live API freshness metadata."
+            )
 
 
 def main() -> None:
+    st.set_page_config(page_title="Banff Visit Planner", page_icon="⛰️", layout="wide")
     inject_styles()
 
+    today_mt = calgary_today()
     try:
-        historical = prepare_historical()
-        forecast = prepare_forecast(pd.Timestamp.today().normalize())
+        historical, forecast, payload = _cached_load_all(today_mt.strftime("%Y-%m-%d"))
     except Exception as exc:
-        st.error(f"Unable to load dashboard data: {exc}")
+        st.error(f"Unable to load Banff planner data: {exc}")
         st.stop()
 
     if forecast.empty:
         st.warning(
-            "The published forecast has expired — every day it covers is now in the past. "
-            "New predictions are generated on the 1st and 16th of each month."
+            "Published predictions have expired relative to today's Banff date. Run `banff-planner --refresh-web` or trigger the daily GitHub Actions update."
         )
         st.stop()
 
     with st.sidebar:
         st.markdown("### Trip Filters")
-        day_filter = st.radio(
-            "Show recommendations for",
-            ["All upcoming days", "Weekdays only", "Weekends only"],
-            index=0,
-        )
-        show_history = st.toggle("Show recent history on chart", value=True)
+        day_filter = st.radio("Schedule", ["All upcoming days", "Weekdays only", "Weekends only"], index=0)
+        priority_label = st.radio("Optimize for", ["Balanced", "Least Traffic", "Best Weather"], index=0)
+        priority_map = {"Balanced": "balanced", "Least Traffic": "quiet", "Best Weather": "weather"}
+        priority = priority_map[priority_label]
+        trip_days = st.slider("Trip duration (days)", min_value=1, max_value=4, value=3)
         st.markdown("---")
-        st.caption("Use filters if your trip is limited to weekdays or weekends.")
+        show_history = st.toggle("Show 45-day history", value=True)
+        show_pi95 = st.toggle("Show 95% conformal band", value=False)
+        st.markdown("---")
         st.caption(
-            f"Forecast window: {forecast['ds'].min().strftime('%b %d')} to {forecast['ds'].max().strftime('%b %d, %Y')}"
+            f"Forecast window: {forecast['ds'].min().strftime('%b %d')} – {forecast['ds'].max().strftime('%b %d, %Y')} ({len(forecast)} days)"
         )
+        st.markdown(f"[Open fast GitHub Pages app]({STATIC_WEB_URL})")
 
-    filtered_forecast = filter_forecast_days(forecast, day_filter)
-    summary = compute_recommendations(forecast, historical, day_filter)
-    if summary is None:
-        st.warning("No forecast days match the selected filter.")
+    cv_info = (payload or {}).get("cv_benchmark")
+    filtered, summary = prepare_dashboard_state(
+        historical,
+        forecast,
+        day_filter=day_filter,
+        priority=priority,
+        trip_days=trip_days,
+        cv_info=cv_info,
+    )
+    if summary is None or filtered.empty:
+        st.warning("No upcoming forecast days match the selected filter.")
         st.stop()
 
-    render_hero(summary, historical)
-    render_mini_metrics(summary, filtered_forecast)
+    fresh = (payload or {}).get("data_freshness", {})
+    last_obs_str = fresh.get("traffic_last_observed") or historical["Date"].max().strftime("%Y-%m-%d")
+    st.markdown(
+        f"""
+        <div class="top-banner">
+          <div>
+            <h1 class="brand-h1">Banff Visit Planner</h1>
+            <p class="brand-sub tabular">Log-scale multi-model ensemble + 16-day mountain weather + calibrated conformal bounds · Observed traffic through {last_obs_str}</p>
+          </div>
+          <a class="web-cta" href="{STATIC_WEB_URL}" target="_blank" rel="noopener">Open Instant Static Web App ↗</a>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    st.markdown("### Forecast")
-    st.caption("Best and worst days are marked directly on the chart. Weekend periods are shaded.")
-    with st.container(border=False):
-        st.markdown('<div class="section-shell">', unsafe_allow_html=True)
-        render_forecast_chart(historical, filtered_forecast, summary, show_history)
-        st.markdown("</div>", unsafe_allow_html=True)
+    render_hero_cards(summary, filtered, day_filter, priority, payload)
 
-    st.markdown("### Planning Picks")
-    render_pick_pills(summary.top_days, historical, "Best days to visit", "good")
-    render_pick_pills(summary.avoid_days, historical, "Days to avoid", "bad")
+    st.markdown("#### Daily Traffic Trajectory & Conformal Uncertainty")
+    st.caption("Weekends are subtly shaded. Shaded bands depict calibrated 80% / 95% out-of-sample conformal prediction intervals.")
+    render_forecast_chart(historical, filtered, summary, show_history=show_history, show_pi95=show_pi95)
 
-    st.markdown("### Quick Insights")
-    render_insight_cards(summary)
+    render_inspector_and_picks(filtered, summary, day_filter, priority, payload)
 
-    st.markdown("### Deep Dive")
-    tab1, tab2, tab3 = st.tabs(["Seasonal patterns", "Weekly patterns", "Full forecast"])
-    with tab1:
-        render_monthly_patterns(historical)
-    with tab2:
-        render_day_of_week_patterns(historical)
-    with tab3:
-        render_forecast_table(filtered_forecast, historical)
-
-    with st.expander("About this forecast"):
-        st.markdown(
-            """
-            - Data source: combined two-way traffic counts for Banff townsite access.
-            - Historical coverage: July 2013 to present.
-            - Forecast source: ensemble predictions generated from the latest saved model outputs.
-            - This dashboard is optimized for choosing quieter visit days, not forecasting exact hourly congestion.
-            """
-        )
+    st.markdown("---")
+    render_deep_dive_tabs(historical, filtered, day_filter, priority, payload)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,2215 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Banff Visit Planner — 15-Day Crowd &amp; Weather Forecast</title>
+  <meta name="description" content="Data-driven 15-day trip planner for Banff, Alberta combining Town of Banff entrance traffic counters, weather forecasts, Alberta holiday bridges, and conformal uncertainty intervals." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #F6F7F5;
+      --surface: #FFFFFF;
+      --surface-alt: #EEF1ED;
+      --surface-subtle: #F9FAF8;
+      --border: #DCE2DC;
+      --border-strong: #C5CEC6;
+      --ink: #14201C;
+      --muted: #52605A;
+      --muted-soft: #75837D;
+      --accent: #0F5C4D;
+      --accent-ink: #FFFFFF;
+      --accent-soft: rgba(15, 92, 77, 0.09);
+      --glacier: #1D6FA5;
+      --glacier-soft: rgba(29, 111, 165, 0.14);
+      --glacier-softer: rgba(29, 111, 165, 0.07);
+      --history: #64748B;
+      --best: #15803D;
+      --best-bg: #E8F6EE;
+      --good: #3F7D20;
+      --good-bg: #EEF7E6;
+      --warn: #B45309;
+      --warn-bg: #FDF3E1;
+      --bad: #B91C1C;
+      --bad-bg: #FDECEC;
+      --weekend-band: rgba(180, 83, 9, 0.06);
+      --shadow-sm: 0 1px 2px rgba(20, 32, 28, 0.04), 0 4px 12px rgba(20, 32, 28, 0.03);
+      --shadow-md: 0 2px 6px rgba(20, 32, 28, 0.05), 0 12px 28px rgba(20, 32, 28, 0.06);
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    html[data-theme="dark"] {
+      --bg: #0E1412;
+      --surface: #161E1B;
+      --surface-alt: #1E2824;
+      --surface-subtle: #1A2320;
+      --border: #2A3732;
+      --border-strong: #394A43;
+      --ink: #F1F5F3;
+      --muted: #9BA8A2;
+      --muted-soft: #76857E;
+      --accent: #34B395;
+      --accent-ink: #07221B;
+      --accent-soft: rgba(52, 179, 149, 0.14);
+      --glacier: #56B4E9;
+      --glacier-soft: rgba(86, 180, 233, 0.18);
+      --glacier-softer: rgba(86, 180, 233, 0.08);
+      --history: #94A3B8;
+      --best: #4ADE80;
+      --best-bg: rgba(34, 197, 94, 0.15);
+      --good: #A3E635;
+      --good-bg: rgba(163, 230, 53, 0.14);
+      --warn: #FBBF24;
+      --warn-bg: rgba(245, 158, 11, 0.15);
+      --bad: #F87171;
+      --bad-bg: rgba(239, 68, 68, 0.15);
+      --weekend-band: rgba(251, 191, 36, 0.06);
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28);
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.36);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    .tabular {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 1.25rem 1.25rem 3.5rem;
+    }
+
+    /* Top Header */
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1.15rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 11px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 1.45rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.15;
+    }
+
+    .brand-meta {
+      margin: 0.15rem 0 0;
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    .topbar-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .nav-tabs {
+      display: inline-flex;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .nav-tab {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0.44rem 0.9rem;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.16s ease, color 0.16s ease;
+      white-space: nowrap;
+    }
+
+    .nav-tab[aria-selected="true"] {
+      background: var(--surface);
+      color: var(--ink);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .nav-tab:hover:not([aria-selected="true"]) {
+      color: var(--ink);
+    }
+
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      font-family: inherit;
+      font-size: 0.84rem;
+      font-weight: 600;
+      padding: 0.46rem 0.8rem;
+      border-radius: 999px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .icon-btn:hover {
+      border-color: var(--border-strong);
+      background: var(--surface-alt);
+    }
+
+    /* Filter Bar */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.9rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 0.85rem 1.05rem;
+      margin-bottom: 1.15rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .filter-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .filter-label {
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-right: 0.25rem;
+    }
+
+    .seg-group {
+      display: inline-flex;
+      background: var(--surface-alt);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 2px;
+      flex-wrap: wrap;
+    }
+
+    .seg-btn {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.83rem;
+      font-weight: 600;
+      padding: 0.36rem 0.72rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .seg-btn[aria-pressed="true"] {
+      background: var(--accent);
+      color: var(--accent-ink);
+    }
+
+    .seg-btn:hover:not([aria-pressed="true"]) {
+      color: var(--ink);
+    }
+
+    /* Views */
+    .view-panel[hidden] {
+      display: none !important;
+    }
+
+    /* Hero Decision Row */
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.08fr 1fr 1.02fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.15rem 1.2rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .hero-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 205px;
+    }
+
+    .eyebrow {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin: 0 0 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .hero-date {
+      font-size: 1.72rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.12;
+      margin: 0 0 0.45rem;
+    }
+
+    .hero-weather-row {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      font-size: 0.9rem;
+      color: var(--ink);
+      font-weight: 600;
+      margin: 0.35rem 0;
+    }
+
+    .hero-sub {
+      font-size: 0.87rem;
+      color: var(--muted);
+      margin: 0.35rem 0 0;
+      line-height: 1.45;
+    }
+
+    .hero-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-top: 0.85rem;
+      padding-top: 0.7rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.83rem;
+    }
+
+    .signal-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.22rem 0.62rem;
+      border-radius: 999px;
+      font-size: 0.77rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tone-best { background: var(--best-bg); color: var(--best); }
+    .tone-good { background: var(--good-bg); color: var(--good); }
+    .tone-warning { background: var(--warn-bg); color: var(--warn); }
+    .tone-bad { background: var(--bad-bg); color: var(--bad); }
+
+    .score-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 0.2rem 0.55rem;
+      border-radius: 8px;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .text-link-btn {
+      border: none;
+      background: transparent;
+      color: var(--accent);
+      font-family: inherit;
+      font-size: 0.83rem;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .text-link-btn:hover {
+      text-decoration: underline;
+    }
+
+    /* Metrics context row */
+    .context-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.85rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .stat-mini {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 0.85rem 1rem;
+    }
+
+    .stat-mini-label {
+      font-size: 0.73rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .stat-mini-value {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 0.15rem;
+    }
+
+    .stat-mini-note {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    /* 15-Day Strip */
+    .section-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin: 0 0 0.65rem;
+    }
+
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.015em;
+      margin: 0;
+    }
+
+    .section-hint {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .outlook-strip {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(128px, 1fr));
+      gap: 0.6rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .day-tile {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      text-align: left;
+      gap: 0.35rem;
+      padding: 0.75rem 0.75rem 0.7rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--ink);
+      transition: transform 0.12s ease, border-color 0.14s ease, box-shadow 0.14s ease, opacity 0.14s ease;
+    }
+
+    .day-tile:hover {
+      transform: translateY(-1px);
+      border-color: var(--border-strong);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .day-tile[aria-pressed="true"] {
+      border-color: var(--accent);
+      background: var(--surface-subtle);
+      box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-sm);
+    }
+
+    .day-tile.is-dimmed {
+      opacity: 0.42;
+    }
+
+    .tile-top {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.25rem;
+    }
+
+    .tile-date {
+      font-size: 0.83rem;
+      font-weight: 700;
+    }
+
+    .tile-dow {
+      font-size: 0.74rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .tile-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .dot-best { background: var(--best); }
+    .dot-good { background: var(--good); }
+    .dot-warning { background: var(--warn); }
+    .dot-bad { background: var(--bad); }
+
+    .tile-wx {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      width: 100%;
+    }
+
+    .tile-vol-row {
+      width: 100%;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-top: 0.15rem;
+    }
+
+    .tile-vol {
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .tile-score {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .tile-event {
+      width: 100%;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-soft);
+      border-radius: 6px;
+      padding: 0.14rem 0.36rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Main Workspace Split: Chart Left + Selected-Day Inspector Right */
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 1.05rem;
+      margin-bottom: 1.4rem;
+      align-items: start;
+    }
+
+    .chart-card {
+      padding: 1.15rem 1.2rem;
+    }
+
+    .chart-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+
+    .toggle-chip {
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.3rem 0.65rem;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+
+    .toggle-chip[aria-pressed="true"] {
+      background: var(--ink);
+      color: var(--surface);
+      border-color: var(--ink);
+    }
+
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      height: 360px;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .chart-tooltip {
+      position: absolute;
+      pointer-events: none;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      padding: 0.55rem 0.75rem;
+      box-shadow: var(--shadow-md);
+      font-size: 0.8rem;
+      min-width: 195px;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity 0.1s ease;
+    }
+
+    .chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.9rem;
+      margin-top: 0.75rem;
+      padding-top: 0.65rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.38rem;
+    }
+
+    .legend-swatch {
+      width: 14px;
+      height: 4px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
+    /* Selected Day Inspector */
+    .inspector-card {
+      padding: 1.15rem 1.2rem;
+    }
+
+    .inspector-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding-bottom: 0.85rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0.95rem;
+    }
+
+    .inspector-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin: 0.15rem 0 0.25rem;
+    }
+
+    .inspector-metric-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.65rem;
+      margin-bottom: 0.95rem;
+    }
+
+    .metric-box {
+      background: var(--surface-alt);
+      border-radius: var(--radius-md);
+      padding: 0.7rem 0.85rem;
+    }
+
+    .metric-box-label {
+      font-size: 0.73rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metric-box-val {
+      font-size: 1.15rem;
+      font-weight: 800;
+      margin: 0.15rem 0 0.08rem;
+    }
+
+    .metric-box-sub {
+      font-size: 0.77rem;
+      color: var(--muted);
+    }
+
+    .sub-heading {
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin: 0.9rem 0 0.45rem;
+    }
+
+    .pct-bar-wrap {
+      margin-bottom: 0.55rem;
+    }
+
+    .pct-bar-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.81rem;
+      margin-bottom: 0.24rem;
+    }
+
+    .pct-track {
+      height: 7px;
+      border-radius: 999px;
+      background: var(--surface-alt);
+      overflow: hidden;
+    }
+
+    .pct-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.2s ease;
+    }
+
+    /* Driver rows */
+    .driver-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+
+    .driver-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.5rem;
+      align-items: center;
+      font-size: 0.82rem;
+      padding: 0.42rem 0.6rem;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+
+    .driver-impact {
+      font-weight: 700;
+      font-size: 0.8rem;
+      padding: 0.1rem 0.42rem;
+      border-radius: 6px;
+    }
+
+    .impact-up { background: var(--warn-bg); color: var(--warn); }
+    .impact-down { background: var(--best-bg); color: var(--best); }
+
+    /* Entrance split bar */
+    .entrance-bar {
+      display: flex;
+      height: 10px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: var(--surface-alt);
+      margin: 0.35rem 0 0.4rem;
+    }
+
+    .entrance-west { background: var(--glacier); }
+    .entrance-east { background: var(--accent); }
+
+    .entrance-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--ink);
+      gap: 0.5rem;
+    }
+
+    .tip-box {
+      margin-top: 0.85rem;
+      padding: 0.68rem 0.82rem;
+      background: var(--accent-soft);
+      border-radius: var(--radius-md);
+      font-size: 0.82rem;
+      color: var(--ink);
+      line-height: 1.45;
+    }
+
+    /* Annual Calendar & Benchmark Views */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .heatmap-wrap {
+      overflow-x: auto;
+      padding-bottom: 0.4rem;
+    }
+
+    .heatmap-grid {
+      min-width: 780px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .hm-row {
+      display: grid;
+      grid-template-columns: 42px repeat(31, 1fr);
+      gap: 3px;
+      align-items: center;
+    }
+
+    .hm-month {
+      font-size: 0.77rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .hm-cell {
+      height: 22px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 0, 0, 0.04);
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    .hm-cell:hover {
+      transform: scale(1.18);
+      z-index: 2;
+      outline: 2px solid var(--ink);
+    }
+
+    .hm-cell.hm-empty {
+      background: transparent;
+      border: none;
+      pointer-events: none;
+    }
+
+    .hm-readout {
+      margin-top: 0.7rem;
+      padding: 0.6rem 0.85rem;
+      background: var(--surface-alt);
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+    }
+
+    th, td {
+      padding: 0.58rem 0.65rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    tr.is-ensemble {
+      background: var(--accent-soft);
+      font-weight: 700;
+    }
+
+    .sources-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.85rem;
+      margin-top: 1rem;
+    }
+
+    .source-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 0.9rem 1rem;
+    }
+
+    .source-title {
+      font-weight: 700;
+      font-size: 0.9rem;
+      margin: 0 0 0.25rem;
+    }
+
+    .source-meta {
+      font-size: 0.81rem;
+      color: var(--muted);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    .footer {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.6rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .footer a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    @media (max-width: 1080px) {
+      .hero-grid { grid-template-columns: 1fr 1fr; }
+      .hero-grid > :last-child { grid-column: 1 / -1; }
+      .context-strip { grid-template-columns: repeat(2, 1fr); }
+      .outlook-strip { grid-template-columns: repeat(4, 1fr); }
+      .workspace-grid { grid-template-columns: 1fr; }
+      .sources-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 720px) {
+      .container { padding: 0.85rem 0.85rem 2.5rem; }
+      .topbar-actions {
+        width: 100%;
+        min-width: 0;
+      }
+      .nav-tabs {
+        width: 100%;
+        max-width: 100%;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .nav-tab {
+        min-width: 0;
+        white-space: normal;
+        text-align: center;
+        line-height: 1.2;
+        padding: 0.44rem 0.25rem;
+        font-size: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .hero-grid { grid-template-columns: 1fr; }
+      .context-strip { grid-template-columns: 1fr 1fr; }
+      .outlook-strip {
+        display: flex;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        padding-bottom: 0.45rem;
+      }
+      .day-tile {
+        min-width: 146px;
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+      }
+      .two-col, .sources-grid { grid-template-columns: 1fr; }
+      .canvas-wrap { height: 290px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 19L9.5 7l4.5 7 3-4 4 9H3z"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">Banff Visit Planner</h1>
+          <p class="brand-meta" id="header-meta">Loading live forecast window…</p>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div class="nav-tabs" role="tablist" aria-label="App Views">
+          <button class="nav-tab" role="tab" id="tab-planner" aria-selected="true" data-view="planner">15-Day Planner</button>
+          <button class="nav-tab" role="tab" id="tab-annual" aria-selected="false" data-view="annual">Year-Round Guide</button>
+          <button class="nav-tab" role="tab" id="tab-science" aria-selected="false" data-view="science">Accuracy &amp; Sources</button>
+        </div>
+        <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle color theme">
+          <span id="theme-icon">☾</span>
+          <span id="theme-label">Dark</span>
+        </button>
+        <a class="icon-btn" href="https://banff-visit-planner-app.streamlit.app/" target="_blank" rel="noopener">Streamlit Alt ↗</a>
+      </div>
+    </header>
+
+    <!-- VIEW 1: 15-DAY TRIP PLANNER -->
+    <section id="view-planner" class="view-panel">
+      <div class="filter-bar" aria-label="Trip planning controls">
+        <div class="filter-group">
+          <span class="filter-label">Schedule</span>
+          <div class="seg-group" id="ctrl-day-filter">
+            <button class="seg-btn" data-filter="All upcoming days" aria-pressed="true" type="button">All days</button>
+            <button class="seg-btn" data-filter="Weekdays only" aria-pressed="false" type="button">Weekdays</button>
+            <button class="seg-btn" data-filter="Weekends only" aria-pressed="false" type="button">Weekends</button>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-label">Optimize for</span>
+          <div class="seg-group" id="ctrl-priority">
+            <button class="seg-btn" data-priority="balanced" aria-pressed="true" type="button">Balanced</button>
+            <button class="seg-btn" data-priority="quiet" aria-pressed="false" type="button">Least Traffic</button>
+            <button class="seg-btn" data-priority="weather" aria-pressed="false" type="button">Best Weather</button>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-label">Stay</span>
+          <div class="seg-group" id="ctrl-trip-days">
+            <button class="seg-btn" data-days="1" aria-pressed="false" type="button">1d</button>
+            <button class="seg-btn" data-days="2" aria-pressed="false" type="button">2d</button>
+            <button class="seg-btn" data-days="3" aria-pressed="true" type="button">3d</button>
+            <button class="seg-btn" data-days="4" aria-pressed="false" type="button">4d</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Instant Decision Hero -->
+      <div class="hero-grid" id="hero-grid"></div>
+
+      <!-- Four Clear Statistical Context Cards -->
+      <div class="context-strip" id="context-strip"></div>
+
+      <!-- 15-Day Interactive Outlook Strip -->
+      <div class="section-head">
+        <h2 class="section-title">Upcoming Day-by-Day Outlook</h2>
+        <span class="section-hint">Select any day to inspect traffic drivers, park entrances &amp; weather details</span>
+      </div>
+      <div class="outlook-strip" id="outlook-strip"></div>
+
+      <!-- Interactive Canvas Chart + Selected Day Deep Dive -->
+      <div class="workspace-grid">
+        <div class="card chart-card">
+          <div class="chart-controls">
+            <div>
+              <h2 class="section-title">Daily Traffic Trajectory &amp; Conformal Bounds</h2>
+              <span class="section-hint">Verified two-way counts + log-scale multi-model ensemble</span>
+            </div>
+            <div class="chip-row">
+              <button class="toggle-chip" id="tog-pi80" aria-pressed="true" type="button">80% Conformal</button>
+              <button class="toggle-chip" id="tog-pi95" aria-pressed="false" type="button">95% Band</button>
+              <button class="toggle-chip" id="tog-hist" aria-pressed="true" type="button">35-Day History</button>
+              <button class="toggle-chip" id="tog-wknd" aria-pressed="true" type="button">Weekends</button>
+            </div>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="forecast-canvas"></canvas>
+            <div class="chart-tooltip" id="chart-tooltip"></div>
+          </div>
+          <div class="chart-legend">
+            <span class="legend-item"><span class="legend-swatch" style="background: var(--history);"></span>Observed history</span>
+            <span class="legend-item"><span class="legend-swatch" style="background: var(--glacier);"></span>Ensemble forecast</span>
+            <span class="legend-item"><span class="legend-swatch" style="background: var(--glacier-soft); height: 10px;"></span>80% Conformal PI</span>
+            <span class="legend-item"><span class="legend-swatch" style="background: var(--best);"></span>Best pick</span>
+            <span class="legend-item"><span class="legend-swatch" style="background: var(--bad);"></span>Peak avoid</span>
+          </div>
+        </div>
+
+        <aside class="card inspector-card" id="day-inspector" aria-live="polite"></aside>
+      </div>
+    </section>
+
+    <!-- VIEW 2: YEAR-ROUND GUIDE -->
+    <section id="view-annual" class="view-panel" hidden>
+      <div class="card" style="margin-bottom: 1rem;">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">365-Day Banff Seasonal Crowd &amp; Weather Calendar</h2>
+            <span class="section-hint">Trailing 3-year smoothed daily volume &amp; BANFF CS climate normals — hover or tap any calendar date</span>
+          </div>
+          <span class="signal-pill tone-best">May · Early June · Early Nov = Calmest</span>
+        </div>
+        <div class="heatmap-wrap">
+          <div class="heatmap-grid" id="annual-heatmap"></div>
+        </div>
+        <div class="hm-readout" id="hm-readout">
+          <span>Hover or tap any day in the calendar grid to inspect historical crowd volume and normal Banff temperatures.</span>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="section-head">
+            <h3 class="section-title">Day-of-Week Traffic Rhythm</h3>
+            <span class="section-hint" id="insight-weekly-text"></span>
+          </div>
+          <div class="canvas-wrap" style="height: 270px;">
+            <canvas id="dow-canvas"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-head">
+            <h3 class="section-title">Monthly Seasonality (Past 3 Years)</h3>
+            <span class="section-hint" id="insight-seasonal-text"></span>
+          </div>
+          <div class="canvas-wrap" style="height: 270px;">
+            <canvas id="monthly-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: ACCURACY & DATA SOURCES -->
+    <section id="view-science" class="view-panel" hidden>
+      <div class="card" style="margin-bottom: 1rem;">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">12-Fold Expanding Cross-Validation Benchmark (Unseen Out-of-Sample Days)</h2>
+            <span class="section-hint" id="cv-subtitle"></span>
+          </div>
+          <span class="score-chip" id="cv-cov-badge"></span>
+        </div>
+        <div style="overflow-x: auto;">
+          <table id="cv-table"></table>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <h3 class="section-title" style="margin-bottom: 0.45rem;">Dynamic Log-Ensemble Composition</h3>
+          <p class="section-hint" style="margin: 0 0 0.85rem;">All weights are learned automatically via inverse out-of-sample RMSE⁴ across orthogonal model families (zero identical clones).</p>
+          <div id="weights-bars"></div>
+        </div>
+        <div class="card">
+          <h3 class="section-title" style="margin-bottom: 0.45rem;">Methodology Fixes Over Prototype v1</h3>
+          <ul style="margin: 0.3rem 0 0; padding-left: 1.15rem; font-size: 0.86rem; color: var(--muted); line-height: 1.55;">
+            <li><strong>Multiplicative ln(y) modeling:</strong> Matches Banff's summer/winter variance scaling.</li>
+            <li><strong>Zero duplicate models:</strong> Replaces cloned NBEATSx checkpoints with CatBoost residual, MLForecast LGBM, Ridge+AR(1), and MSTL+ETS.</li>
+            <li><strong>Real Conformal Intervals (80%/95%):</strong> Stratified by weekday vs weekend &amp; horizon instead of heuristic min/max model range.</li>
+            <li><strong>Conditional Day-Type Percentiles &amp; Contiguous Windows:</strong> Compares weekends fairly to seasonal weekends and validates contiguous calendar spans.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="sources-grid" id="sources-grid"></div>
+    </section>
+
+    <footer class="footer">
+      <span>Banff Visit Planner v2.0 · Traffic counts via Town of Banff Open Tableau · Climate via ECCC BANFF CS &amp; Open-Meteo · Macro via BoC, StatCan &amp; Alberta Economic Dashboard</span>
+      <span><a href="https://github.com/v-datos/Banff_Visit_Planner_App" target="_blank" rel="noopener">GitHub Repository</a> · Daily automated CI refresh</span>
+    </footer>
+  </div>
+
+  <script id="banff-payload-data" type="application/json">{"schema_version":"2.0.0","generated_at_utc":"2026-11-13 16:59 UTC","generated_date_mt":"2026-11-13","forecast_window":{"start":"2026-11-13","end":"2026-11-28","n_days":16,"total_horizon_days":17},"data_freshness":{"generated_at_utc":"2026-11-13 16:59 UTC","generated_date_mt":"2026-11-13","traffic_days":4882,"traffic_start_date":"2013-07-01","traffic_last_observed":"2026-11-11","mountain_ave_last_observed":"2026-11-11","weather_realized_through":"2026-11-12","weather_forecast_through":"2026-11-28","fx_last_observed":"2026-11-12","fx_latest_usdcad":1.4255,"statcan_macro_through":"2026-08-31","alberta_hwy1_through":"2026-08-31","alberta_park_attendance_through":"2026-09-30","latest_macro_snapshot":{"AB_LFS_UnempRate_SA":7.3,"AB_Gas_Real":142.61,"AB_CPI_Gasoline":254.7,"AB_Visitors_Intl":212328.0},"zero_waste_excluded":true},"cv_benchmark":{"n_folds":12,"n_oof_days":192,"horizon_days":16,"empirical_cov80_pct":79.2,"empirical_cov95_pct":94.8,"runtime_sec":25.77,"ensemble_weights":{"Hybrid_Ridge_CatBoost":0.5007,"MLForecast_LGBM":0.2592,"Ridge_AR_Exo":0.1801,"LogMSTL_ETS":0.06},"summary_metrics":[{"model":"Hybrid_Ridge_CatBoost","MAE":1025.1448975736564,"RMSE":1358.1274343413431,"MAPE":5.564281872812477,"sMAPE":5.48131462096475,"MASE":0.5164697464529299,"Bias_pct":1.257958418258874},{"model":"Ensemble_Weighted","MAE":1071.2531514281666,"RMSE":1410.5159782235105,"MAPE":5.686761893821128,"sMAPE":5.644665914427602,"MASE":0.5397008214726342,"Bias_pct":0.9273324747996948},{"model":"MLForecast_LGBM","MAE":1255.701445867153,"RMSE":1601.03752655132,"MAPE":6.806045799690487,"sMAPE":6.761719523231863,"MASE":0.6327137260707457,"Bias_pct":0.9326917082620624},{"model":"Ridge_AR_Exo","MAE":1395.6311893691243,"RMSE":1753.7314004341317,"MAPE":7.340900324483297,"sMAPE":7.2367818869803004,"MASE":0.7029992782085389,"Bias_pct":1.799495201614869},{"model":"SeasonalNaive364","MAE":1430.229166666666,"RMSE":1839.1612897928746,"MAPE":8.015654163932707,"sMAPE":8.274678128173404,"MASE":0.7205692882743597,"Bias_pct":-1.8713298276830146},{"model":"LogMSTL_ETS","MAE":1924.4469199250823,"RMSE":2308.3501841938614,"MAPE":9.375789694186496,"sMAPE":9.619749850492306,"MASE":0.9693810657968701,"Bias_pct":-2.012184215781086}]},"insights":{"weekly_insight":"Tuesdays are typically quietest over the past 3 years (~20% less traffic than Saturdays).","seasonal_insight":"Jul is peak season, while Jan is Banff's calmest month.","conformal_label":"Standard","conformal_detail":"True 80% conformal uncertainty is ±9.0%/day (empirically 79% coverage across 192 unseen CV days)."},"recent_history":[{"ds":"2026-09-28","vehicles":22391,"west_entrance":11968,"east_entrance":10423,"mountain_ave":3366,"is_weekend":false,"is_observed":true,"temp_max_c":14.5,"temp_min_c":-2.1,"precip_mm":0.0},{"ds":"2026-09-29","vehicles":20942,"west_entrance":10783,"east_entrance":10159,"mountain_ave":2841,"is_weekend":false,"is_observed":true,"temp_max_c":11.1,"temp_min_c":4.7,"precip_mm":1.5},{"ds":"2026-09-30","vehicles":22790,"west_entrance":12191,"east_entrance":10599,"mountain_ave":3652,"is_weekend":false,"is_observed":true,"temp_max_c":11.5,"temp_min_c":-1.5,"precip_mm":0.1},{"ds":"2026-10-01","vehicles":21399,"west_entrance":11533,"east_entrance":9866,"mountain_ave":3052,"is_weekend":false,"is_observed":true,"temp_max_c":11.9,"temp_min_c":-5.5,"precip_mm":0.0},{"ds":"2026-10-02","vehicles":22185,"west_entrance":11936,"east_entrance":10249,"mountain_ave":3273,"is_weekend":false,"is_observed":true,"temp_max_c":14.3,"temp_min_c":3.9,"precip_mm":0.0},{"ds":"2026-10-03","vehicles":24104,"west_entrance":13182,"east_entrance":10922,"mountain_ave":3835,"is_weekend":true,"is_observed":true,"temp_max_c":17.2,"temp_min_c":1.4,"precip_mm":0.0},{"ds":"2026-10-04","vehicles":24037,"west_entrance":12921,"east_entrance":11116,"mountain_ave":3738,"is_weekend":true,"is_observed":true,"temp_max_c":20.7,"temp_min_c":-2.2,"precip_mm":0.0},{"ds":"2026-10-05","vehicles":19836,"west_entrance":10753,"east_entrance":9083,"mountain_ave":2980,"is_weekend":false,"is_observed":true,"temp_max_c":19.2,"temp_min_c":4.8,"precip_mm":0.0},{"ds":"2026-10-06","vehicles":18108,"west_entrance":10005,"east_entrance":8103,"mountain_ave":2687,"is_weekend":false,"is_observed":true,"temp_max_c":18.6,"temp_min_c":3.0,"precip_mm":0.0},{"ds":"2026-10-07","vehicles":18274,"west_entrance":9244,"east_entrance":9030,"mountain_ave":2675,"is_weekend":false,"is_observed":true,"temp_max_c":19.3,"temp_min_c":-0.9,"precip_mm":0.0},{"ds":"2026-10-08","vehicles":18069,"west_entrance":9097,"east_entrance":8972,"mountain_ave":2541,"is_weekend":false,"is_observed":true,"temp_max_c":20.0,"temp_min_c":4.3,"precip_mm":0.0},{"ds":"2026-10-09","vehicles":19323,"west_entrance":9264,"east_entrance":10059,"mountain_ave":2694,"is_weekend":false,"is_observed":true,"temp_max_c":16.7,"temp_min_c":0.3,"precip_mm":2.5},{"ds":"2026-10-10","vehicles":19689,"west_entrance":10757,"east_entrance":8932,"mountain_ave":3360,"is_weekend":true,"is_observed":true,"temp_max_c":3.6,"temp_min_c":-1.6,"precip_mm":0.3},{"ds":"2026-10-11","vehicles":19801,"west_entrance":11177,"east_entrance":8624,"mountain_ave":3489,"is_weekend":true,"is_observed":true,"temp_max_c":1.2,"temp_min_c":-3.5,"precip_mm":0.2},{"ds":"2026-10-12","vehicles":19522,"west_entrance":10888,"east_entrance":8634,"mountain_ave":3440,"is_weekend":false,"is_observed":true,"temp_max_c":11.3,"temp_min_c":-6.0,"precip_mm":0.0},{"ds":"2026-10-13","vehicles":16709,"west_entrance":9038,"east_entrance":7671,"mountain_ave":2520,"is_weekend":false,"is_observed":true,"temp_max_c":12.4,"temp_min_c":-1.1,"precip_mm":0.0},{"ds":"2026-10-14","vehicles":16510,"west_entrance":8340,"east_entrance":8170,"mountain_ave":2506,"is_weekend":false,"is_observed":true,"temp_max_c":15.1,"temp_min_c":2.3,"precip_mm":0.0},{"ds":"2026-10-15","vehicles":16491,"west_entrance":8570,"east_entrance":7921,"mountain_ave":2540,"is_weekend":false,"is_observed":true,"temp_max_c":14.5,"temp_min_c":-3.8,"precip_mm":0.0},{"ds":"2026-10-16","vehicles":18775,"west_entrance":9465,"east_entrance":9310,"mountain_ave":2906,"is_weekend":false,"is_observed":true,"temp_max_c":18.4,"temp_min_c":-0.8,"precip_mm":0.0},{"ds":"2026-10-17","vehicles":20174,"west_entrance":10727,"east_entrance":9447,"mountain_ave":2947,"is_weekend":true,"is_observed":true,"temp_max_c":13.6,"temp_min_c":3.1,"precip_mm":0.0},{"ds":"2026-10-18","vehicles":18228,"west_entrance":9716,"east_entrance":8512,"mountain_ave":2613,"is_weekend":true,"is_observed":true,"temp_max_c":10.7,"temp_min_c":-5.3,"precip_mm":0.0},{"ds":"2026-10-19","vehicles":14937,"west_entrance":7933,"east_entrance":7004,"mountain_ave":2063,"is_weekend":false,"is_observed":true,"temp_max_c":12.1,"temp_min_c":-3.4,"precip_mm":0.0},{"ds":"2026-10-20","vehicles":14453,"west_entrance":7395,"east_entrance":7058,"mountain_ave":2113,"is_weekend":false,"is_observed":true,"temp_max_c":14.0,"temp_min_c":-8.1,"precip_mm":0.0},{"ds":"2026-10-21","vehicles":15228,"west_entrance":7900,"east_entrance":7328,"mountain_ave":2252,"is_weekend":false,"is_observed":true,"temp_max_c":16.9,"temp_min_c":-2.3,"precip_mm":0.0},{"ds":"2026-10-22","vehicles":14837,"west_entrance":7704,"east_entrance":7133,"mountain_ave":2197,"is_weekend":false,"is_observed":true,"temp_max_c":18.1,"temp_min_c":0.0,"precip_mm":0.0},{"ds":"2026-10-23","vehicles":15745,"west_entrance":8006,"east_entrance":7739,"mountain_ave":2112,"is_weekend":false,"is_observed":true,"temp_max_c":7.0,"temp_min_c":-6.4,"precip_mm":5.9},{"ds":"2026-10-24","vehicles":16157,"west_entrance":8105,"east_entrance":8052,"mountain_ave":2329,"is_weekend":true,"is_observed":true,"temp_max_c":1.0,"temp_min_c":-7.8,"precip_mm":1.8},{"ds":"2026-10-25","vehicles":14593,"west_entrance":7497,"east_entrance":7096,"mountain_ave":1925,"is_weekend":true,"is_observed":true,"temp_max_c":1.2,"temp_min_c":-4.8,"precip_mm":0.4},{"ds":"2026-10-26","vehicles":12869,"west_entrance":6761,"east_entrance":6108,"mountain_ave":1889,"is_weekend":false,"is_observed":true,"temp_max_c":5.8,"temp_min_c":-7.6,"precip_mm":0.0},{"ds":"2026-10-27","vehicles":11587,"west_entrance":5983,"east_entrance":5604,"mountain_ave":1561,"is_weekend":false,"is_observed":true,"temp_max_c":2.7,"temp_min_c":-2.4,"precip_mm":0.4},{"ds":"2026-10-28","vehicles":11215,"west_entrance":5705,"east_entrance":5510,"mountain_ave":1367,"is_weekend":false,"is_observed":true,"temp_max_c":0.5,"temp_min_c":-4.7,"precip_mm":1.5},{"ds":"2026-10-29","vehicles":11908,"west_entrance":6130,"east_entrance":5778,"mountain_ave":1679,"is_weekend":false,"is_observed":true,"temp_max_c":-0.7,"temp_min_c":-8.4,"precip_mm":0.0},{"ds":"2026-10-30","vehicles":12911,"west_entrance":6804,"east_entrance":6107,"mountain_ave":1750,"is_weekend":false,"is_observed":true,"temp_max_c":3.1,"temp_min_c":-10.0,"precip_mm":0.0},{"ds":"2026-10-31","vehicles":13135,"west_entrance":6564,"east_entrance":6571,"mountain_ave":1722,"is_weekend":true,"is_observed":true,"temp_max_c":7.2,"temp_min_c":-8.2,"precip_mm":0.0},{"ds":"2026-11-01","vehicles":12640,"west_entrance":6410,"east_entrance":6230,"mountain_ave":1459,"is_weekend":true,"is_observed":true,"temp_max_c":5.8,"temp_min_c":-8.0,"precip_mm":0.0},{"ds":"2026-11-02","vehicles":11904,"west_entrance":6227,"east_entrance":5677,"mountain_ave":1412,"is_weekend":false,"is_observed":true,"temp_max_c":8.1,"temp_min_c":-6.6,"precip_mm":0.0},{"ds":"2026-11-03","vehicles":10990,"west_entrance":5483,"east_entrance":5507,"mountain_ave":1435,"is_weekend":false,"is_observed":true,"temp_max_c":3.3,"temp_min_c":-3.3,"precip_mm":0.0},{"ds":"2026-11-04","vehicles":11900,"west_entrance":6190,"east_entrance":5710,"mountain_ave":1679,"is_weekend":false,"is_observed":true,"temp_max_c":7.7,"temp_min_c":-7.3,"precip_mm":0.0},{"ds":"2026-11-05","vehicles":12280,"west_entrance":6349,"east_entrance":5931,"mountain_ave":1734,"is_weekend":false,"is_observed":true,"temp_max_c":3.7,"temp_min_c":-2.7,"precip_mm":0.0},{"ds":"2026-11-06","vehicles":13899,"west_entrance":6985,"east_entrance":6914,"mountain_ave":2030,"is_weekend":false,"is_observed":true,"temp_max_c":9.6,"temp_min_c":0.6,"precip_mm":0.0},{"ds":"2026-11-07","vehicles":17794,"west_entrance":9319,"east_entrance":8475,"mountain_ave":3072,"is_weekend":true,"is_observed":true,"temp_max_c":10.8,"temp_min_c":1.3,"precip_mm":0.0},{"ds":"2026-11-08","vehicles":15267,"west_entrance":7655,"east_entrance":7612,"mountain_ave":2213,"is_weekend":true,"is_observed":true,"temp_max_c":6.9,"temp_min_c":2.1,"precip_mm":5.0},{"ds":"2026-11-09","vehicles":13677,"west_entrance":7235,"east_entrance":6442,"mountain_ave":2243,"is_weekend":false,"is_observed":true,"temp_max_c":7.4,"temp_min_c":-2.0,"precip_mm":0.0},{"ds":"2026-11-10","vehicles":13730,"west_entrance":7234,"east_entrance":6496,"mountain_ave":2133,"is_weekend":false,"is_observed":true,"temp_max_c":9.1,"temp_min_c":1.4,"precip_mm":0.0},{"ds":"2026-11-11","vehicles":16738,"west_entrance":8414,"east_entrance":8324,"mountain_ave":2904,"is_weekend":false,"is_observed":true,"temp_max_c":13.8,"temp_min_c":4.2,"precip_mm":0.0}],"forecast_days":[{"ds":"2026-11-12","dow":"Thursday","dow_short":"Thu","date_short":"Nov 12","is_weekend":false,"is_bridge_gap":true,"ensemble":14620,"pi80_low":13413,"pi80_high":15718,"pi95_low":12616,"pi95_high":16711,"west_entrance":7750,"east_entrance":6870,"mountain_ave":2003,"west_share_pct":53.0,"dow_seasonal_norm":12334,"vs_dow_norm_pct":18.5,"overall_percentile":62.5,"daytype_percentile":83.9,"signal_overall":"Busy day","tone_overall":"warning","signal_daytype":"Heavy crowds for this day type","tone_daytype":"bad","traffic_score_overall":37.5,"traffic_score_daytype":16.1,"weather_score":94.5,"weather_label":"Overcast","weather_icon":"cloud","temp_max_c":13.7,"temp_min_c":4.2,"precip_prob_pct":0.0,"precip_mm":0.0,"snowfall_cm":0.0,"wind_max_kmh":20.0,"visit_score_quiet":37.5,"visit_score_balanced":57.4,"visit_score_weather":74.6,"visit_score_scoped_balanced":43.5,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":2.6,"regime_pct":5.2,"nonlinear_pct":5.0,"drivers":[{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":5.2,"category":"macro"},{"factor":"Tree & MSTL non-linear seasonal adjustment","impact_pct":5.0,"category":"nonlinear"},{"factor":"Mild / clear weather boost","impact_pct":2.6,"category":"weather"}]},"models":{"SeasonalNaive364":13155.0,"LogMSTL_ETS":15093.8,"Ridge_AR_Exo":13922.6,"MLForecast_LGBM":15644.8,"Hybrid_Ridge_CatBoost":14312.3}},{"ds":"2026-11-13","dow":"Friday","dow_short":"Fri","date_short":"Nov 13","is_weekend":false,"is_bridge_gap":false,"ensemble":15364,"pi80_low":14082,"pi80_high":16534,"pi95_low":13235,"pi95_high":17592,"west_entrance":8145,"east_entrance":7219,"mountain_ave":2105,"west_share_pct":53.0,"dow_seasonal_norm":14514,"vs_dow_norm_pct":5.9,"overall_percentile":73.4,"daytype_percentile":91.9,"signal_overall":"Busy day","tone_overall":"warning","signal_daytype":"Heavy crowds for this day type","tone_daytype":"bad","traffic_score_overall":26.6,"traffic_score_daytype":8.1,"weather_score":94.5,"weather_label":"Overcast","weather_icon":"cloud","temp_max_c":11.8,"temp_min_c":-1.2,"precip_prob_pct":0.0,"precip_mm":0.0,"snowfall_cm":0.0,"wind_max_kmh":14.0,"visit_score_quiet":26.6,"visit_score_balanced":50.4,"visit_score_weather":70.7,"visit_score_scoped_balanced":38.3,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":3.0,"regime_pct":5.4,"nonlinear_pct":-0.7,"drivers":[{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":5.4,"category":"macro"},{"factor":"Mild / clear weather boost","impact_pct":3.0,"category":"weather"}]},"models":{"SeasonalNaive364":13597.0,"LogMSTL_ETS":14826.5,"Ridge_AR_Exo":15466.7,"MLForecast_LGBM":16183.4,"Hybrid_Ridge_CatBoost":14984.7}},{"ds":"2026-11-14","dow":"Saturday","dow_short":"Sat","date_short":"Nov 14","is_weekend":true,"is_bridge_gap":false,"ensemble":17605,"pi80_low":15659,"pi80_high":19521,"pi95_low":14462,"pi95_high":21136,"west_entrance":9301,"east_entrance":8304,"mountain_ave":3009,"west_share_pct":52.8,"dow_seasonal_norm":17393,"vs_dow_norm_pct":1.2,"overall_percentile":89.1,"daytype_percentile":76.9,"signal_overall":"Avoid if possible","tone_overall":"bad","signal_daytype":"Busy for this day type","tone_daytype":"warning","traffic_score_overall":10.9,"traffic_score_daytype":23.1,"weather_score":94.5,"weather_label":"Overcast","weather_icon":"cloud","temp_max_c":9.5,"temp_min_c":-1.2,"precip_prob_pct":3.0,"precip_mm":0.0,"snowfall_cm":0.0,"wind_max_kmh":19.0,"visit_score_quiet":10.9,"visit_score_balanced":40.2,"visit_score_weather":65.2,"visit_score_scoped_balanced":48.1,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":6.4,"regime_pct":5.6,"nonlinear_pct":-1.5,"drivers":[{"factor":"Mild / clear weather boost","impact_pct":6.4,"category":"weather"},{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":5.6,"category":"macro"},{"factor":"Tree & MSTL non-linear seasonal adjustment","impact_pct":-1.5,"category":"nonlinear"}]},"models":{"SeasonalNaive364":15737.0,"LogMSTL_ETS":15439.7,"Ridge_AR_Exo":17881.3,"MLForecast_LGBM":18065.6,"Hybrid_Ridge_CatBoost":17547.5}},{"ds":"2026-11-15","dow":"Sunday","dow_short":"Sun","date_short":"Nov 15","is_weekend":true,"is_bridge_gap":false,"ensemble":15586,"pi80_low":13846,"pi80_high":17305,"pi95_low":12775,"pi95_high":18755,"west_entrance":8234,"east_entrance":7352,"mountain_ave":2664,"west_share_pct":52.8,"dow_seasonal_norm":14901,"vs_dow_norm_pct":4.6,"overall_percentile":73.4,"daytype_percentile":42.3,"signal_overall":"Busy day","tone_overall":"warning","signal_daytype":"Good for this day type","tone_daytype":"good","traffic_score_overall":26.6,"traffic_score_daytype":57.7,"weather_score":94.5,"weather_label":"Overcast","weather_icon":"cloud","temp_max_c":5.3,"temp_min_c":-1.9,"precip_prob_pct":5.0,"precip_mm":0.0,"snowfall_cm":0.0,"wind_max_kmh":12.0,"visit_score_quiet":26.6,"visit_score_balanced":50.4,"visit_score_weather":70.7,"visit_score_scoped_balanced":70.6,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":3.9,"regime_pct":5.7,"nonlinear_pct":-4.0,"drivers":[{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":5.7,"category":"macro"},{"factor":"Tree & MSTL non-linear seasonal adjustment","impact_pct":-4.0,"category":"nonlinear"},{"factor":"Mild / clear weather boost","impact_pct":3.9,"category":"weather"}]},"models":{"SeasonalNaive364":13879.0,"LogMSTL_ETS":13743.7,"Ridge_AR_Exo":16234.8,"MLForecast_LGBM":15589.8,"Hybrid_Ridge_CatBoost":15590.4}},{"ds":"2026-11-16","dow":"Monday","dow_short":"Mon","date_short":"Nov 16","is_weekend":false,"is_bridge_gap":false,"ensemble":12461,"pi80_low":11388,"pi80_high":13448,"pi95_low":10679,"pi95_high":14341,"west_entrance":6606,"east_entrance":5855,"mountain_ave":1708,"west_share_pct":53.0,"dow_seasonal_norm":11164,"vs_dow_norm_pct":11.6,"overall_percentile":31.2,"daytype_percentile":55.6,"signal_overall":"Good day to visit","tone_overall":"good","signal_daytype":"Busy for this day type","tone_daytype":"warning","traffic_score_overall":68.8,"traffic_score_daytype":44.4,"weather_score":85.1,"weather_label":"Light drizzle","weather_icon":"drizzle","temp_max_c":5.5,"temp_min_c":-1.5,"precip_prob_pct":20.0,"precip_mm":0.4,"snowfall_cm":0.0,"wind_max_kmh":9.0,"visit_score_quiet":68.8,"visit_score_balanced":74.5,"visit_score_weather":79.4,"visit_score_scoped_balanced":58.6,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":-1.0,"regime_pct":5.8,"nonlinear_pct":-4.5,"drivers":[{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":5.8,"category":"macro"},{"factor":"Tree & MSTL non-linear seasonal adjustment","impact_pct":-4.5,"category":"nonlinear"},{"factor":"Precipitation / cold weather dampener","impact_pct":-1.0,"category":"weather"}]},"models":{"SeasonalNaive364":11449.0,"LogMSTL_ETS":12244.1,"Ridge_AR_Exo":13054.6,"MLForecast_LGBM":12197.1,"Hybrid_Ridge_CatBoost":12416.6}},{"ds":"2026-11-17","dow":"Tuesday","dow_short":"Tue","date_short":"Nov 17","is_weekend":false,"is_bridge_gap":false,"ensemble":12312,"pi80_low":11242,"pi80_high":13300,"pi95_low":10534,"pi95_high":14194,"west_entrance":6527,"east_entrance":5785,"mountain_ave":1687,"west_share_pct":53.0,"dow_seasonal_norm":11074,"vs_dow_norm_pct":11.2,"overall_percentile":32.8,"daytype_percentile":54.0,"signal_overall":"Good day to visit","tone_overall":"good","signal_daytype":"Good for this day type","tone_daytype":"good","traffic_score_overall":67.2,"traffic_score_daytype":46.0,"weather_score":94.5,"weather_label":"Overcast","weather_icon":"cloud","temp_max_c":3.9,"temp_min_c":-4.2,"precip_prob_pct":5.0,"precip_mm":0.0,"snowfall_cm":0.0,"wind_max_kmh":7.0,"visit_score_quiet":67.2,"visit_score_balanced":76.8,"visit_score_weather":84.9,"visit_score_scoped_balanced":63.0,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":-1.4,"regime_pct":5.8,"nonlinear_pct":-5.0,"drivers":[{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":5.8,"category":"macro"},{"factor":"Tree & MSTL non-linear seasonal adjustment","impact_pct":-5.0,"category":"nonlinear"},{"factor":"Precipitation / cold weather dampener","impact_pct":-1.4,"category":"weather"}]},"models":{"SeasonalNaive364":10693.0,"LogMSTL_ETS":11630.6,"Ridge_AR_Exo":12954.2,"MLForecast_LGBM":12079.8,"Hybrid_Ridge_CatBoost":12293.1}},{"ds":"2026-11-18","dow":"Wednesday","dow_short":"Wed","date_short":"Nov 18","is_weekend":false,"is_bridge_gap":false,"ensemble":12523,"pi80_low":11424,"pi80_high":13541,"pi95_low":10697,"pi95_high":14461,"west_entrance":6639,"east_entrance":5884,"mountain_ave":1716,"west_share_pct":53.0,"dow_seasonal_norm":11449,"vs_dow_norm_pct":9.4,"overall_percentile":35.9,"daytype_percentile":56.5,"signal_overall":"Good day to visit","tone_overall":"good","signal_daytype":"Busy for this day type","tone_daytype":"warning","traffic_score_overall":64.1,"traffic_score_daytype":43.5,"weather_score":97.2,"weather_label":"Partly cloudy","weather_icon":"partly-cloudy","temp_max_c":2.7,"temp_min_c":-6.5,"precip_prob_pct":9.0,"precip_mm":0.0,"snowfall_cm":0.0,"wind_max_kmh":5.0,"visit_score_quiet":64.1,"visit_score_balanced":75.7,"visit_score_weather":85.6,"visit_score_scoped_balanced":62.3,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":-1.9,"regime_pct":5.9,"nonlinear_pct":-4.4,"drivers":[{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":5.9,"category":"macro"},{"factor":"Tree & MSTL non-linear seasonal adjustment","impact_pct":-4.4,"category":"nonlinear"},{"factor":"Precipitation / cold weather dampener","impact_pct":-1.9,"category":"weather"}]},"models":{"SeasonalNaive364":11449.0,"LogMSTL_ETS":12027.9,"Ridge_AR_Exo":13097.3,"MLForecast_LGBM":12450.0,"Hybrid_Ridge_CatBoost":12420.7}},{"ds":"2026-11-19","dow":"Thursday","dow_short":"Thu","date_short":"Nov 19","is_weekend":false,"is_bridge_gap":false,"ensemble":13371,"pi80_low":12186,"pi80_high":14471,"pi95_low":11402,"pi95_high":15465,"west_entrance":7088,"east_entrance":6283,"mountain_ave":1832,"west_share_pct":53.0,"dow_seasonal_norm":12149,"vs_dow_norm_pct":10.1,"overall_percentile":43.8,"daytype_percentile":64.5,"signal_overall":"Good day to visit","tone_overall":"good","signal_daytype":"Busy for this day type","tone_daytype":"warning","traffic_score_overall":56.2,"traffic_score_daytype":35.5,"weather_score":94.5,"weather_label":"Overcast","weather_icon":"cloud","temp_max_c":2.6,"temp_min_c":-6.4,"precip_prob_pct":9.0,"precip_mm":0.0,"snowfall_cm":0.0,"wind_max_kmh":3.0,"visit_score_quiet":56.2,"visit_score_balanced":69.6,"visit_score_weather":81.1,"visit_score_scoped_balanced":56.1,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":-2.5,"regime_pct":5.9,"nonlinear_pct":-1.4,"drivers":[{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":5.9,"category":"macro"},{"factor":"Precipitation / cold weather dampener","impact_pct":-2.5,"category":"weather"}]},"models":{"SeasonalNaive364":13015.0,"LogMSTL_ETS":12616.0,"Ridge_AR_Exo":13563.1,"MLForecast_LGBM":13336.3,"Hybrid_Ridge_CatBoost":13413.6}},{"ds":"2026-11-20","dow":"Friday","dow_short":"Fri","date_short":"Nov 20","is_weekend":false,"is_bridge_gap":false,"ensemble":15177,"pi80_low":13819,"pi80_high":16440,"pi95_low":12922,"pi95_high":17582,"west_entrance":8045,"east_entrance":7132,"mountain_ave":2080,"west_share_pct":53.0,"dow_seasonal_norm":14514,"vs_dow_norm_pct":4.6,"overall_percentile":71.9,"daytype_percentile":90.3,"signal_overall":"Busy day","tone_overall":"warning","signal_daytype":"Heavy crowds for this day type","tone_daytype":"bad","traffic_score_overall":28.1,"traffic_score_daytype":9.7,"weather_score":94.5,"weather_label":"Overcast","weather_icon":"cloud","temp_max_c":4.1,"temp_min_c":-7.1,"precip_prob_pct":3.0,"precip_mm":0.0,"snowfall_cm":0.0,"wind_max_kmh":6.0,"visit_score_quiet":28.1,"visit_score_balanced":51.3,"visit_score_weather":71.3,"visit_score_scoped_balanced":39.4,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":-2.0,"regime_pct":6.0,"nonlinear_pct":0.6,"drivers":[{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":6.0,"category":"macro"},{"factor":"Precipitation / cold weather dampener","impact_pct":-2.0,"category":"weather"}]},"models":{"SeasonalNaive364":14841.0,"LogMSTL_ETS":14100.0,"Ridge_AR_Exo":15084.5,"MLForecast_LGBM":15654.6,"Hybrid_Ridge_CatBoost":15100.7}},{"ds":"2026-11-21","dow":"Saturday","dow_short":"Sat","date_short":"Nov 21","is_weekend":true,"is_bridge_gap":false,"ensemble":16807,"pi80_low":14818,"pi80_high":18801,"pi95_low":13598,"pi95_high":20487,"west_entrance":8879,"east_entrance":7928,"mountain_ave":2873,"west_share_pct":52.8,"dow_seasonal_norm":17151,"vs_dow_norm_pct":-2.0,"overall_percentile":82.8,"daytype_percentile":46.2,"signal_overall":"Avoid if possible","tone_overall":"bad","signal_daytype":"Good for this day type","tone_daytype":"good","traffic_score_overall":17.2,"traffic_score_daytype":53.8,"weather_score":94.5,"weather_label":"Overcast","weather_icon":"cloud","temp_max_c":-0.3,"temp_min_c":-7.3,"precip_prob_pct":2.0,"precip_mm":0.0,"snowfall_cm":0.0,"wind_max_kmh":6.0,"visit_score_quiet":17.2,"visit_score_balanced":44.3,"visit_score_weather":67.4,"visit_score_scoped_balanced":68.0,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":-3.3,"regime_pct":6.0,"nonlinear_pct":0.9,"drivers":[{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":6.0,"category":"macro"},{"factor":"Precipitation / cold weather dampener","impact_pct":-3.3,"category":"weather"}]},"models":{"SeasonalNaive364":16850.0,"LogMSTL_ETS":15280.7,"Ridge_AR_Exo":16653.6,"MLForecast_LGBM":17683.6,"Hybrid_Ridge_CatBoost":16612.1}},{"ds":"2026-11-22","dow":"Sunday","dow_short":"Sun","date_short":"Nov 22","is_weekend":true,"is_bridge_gap":false,"ensemble":15892,"pi80_low":13995,"pi80_high":17799,"pi95_low":12832,"pi95_high":19413,"west_entrance":8396,"east_entrance":7496,"mountain_ave":2716,"west_share_pct":52.8,"dow_seasonal_norm":15120,"vs_dow_norm_pct":5.1,"overall_percentile":84.1,"daytype_percentile":46.2,"signal_overall":"Avoid if possible","tone_overall":"bad","signal_daytype":"Good for this day type","tone_daytype":"good","traffic_score_overall":15.9,"traffic_score_daytype":53.8,"weather_score":94.5,"weather_label":"Overcast","weather_icon":"cloud","temp_max_c":1.7,"temp_min_c":-8.1,"precip_prob_pct":8.0,"precip_mm":0.0,"snowfall_cm":0.0,"wind_max_kmh":6.0,"visit_score_quiet":15.9,"visit_score_balanced":43.4,"visit_score_weather":67.0,"visit_score_scoped_balanced":68.0,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":-3.0,"regime_pct":6.1,"nonlinear_pct":2.3,"drivers":[{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":6.1,"category":"macro"},{"factor":"Precipitation / cold weather dampener","impact_pct":-3.0,"category":"weather"},{"factor":"Tree & MSTL non-linear seasonal adjustment","impact_pct":2.3,"category":"nonlinear"}]},"models":{"SeasonalNaive364":14550.0,"LogMSTL_ETS":14512.7,"Ridge_AR_Exo":15535.3,"MLForecast_LGBM":15714.6,"Hybrid_Ridge_CatBoost":16292.0}},{"ds":"2026-11-23","dow":"Monday","dow_short":"Mon","date_short":"Nov 23","is_weekend":false,"is_bridge_gap":false,"ensemble":12518,"pi80_low":11368,"pi80_high":13596,"pi95_low":10608,"pi95_high":14571,"west_entrance":6636,"east_entrance":5882,"mountain_ave":1715,"west_share_pct":53.0,"dow_seasonal_norm":11104,"vs_dow_norm_pct":12.7,"overall_percentile":46.0,"daytype_percentile":58.7,"signal_overall":"Good day to visit","tone_overall":"good","signal_daytype":"Busy for this day type","tone_daytype":"warning","traffic_score_overall":54.0,"traffic_score_daytype":41.3,"weather_score":97.2,"weather_label":"Partly cloudy","weather_icon":"partly-cloudy","temp_max_c":5.1,"temp_min_c":-4.9,"precip_prob_pct":8.0,"precip_mm":0.0,"snowfall_cm":0.0,"wind_max_kmh":9.0,"visit_score_quiet":54.0,"visit_score_balanced":69.1,"visit_score_weather":82.1,"visit_score_scoped_balanced":60.9,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":-2.7,"regime_pct":6.1,"nonlinear_pct":-4.9,"drivers":[{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":6.1,"category":"macro"},{"factor":"Tree & MSTL non-linear seasonal adjustment","impact_pct":-4.9,"category":"nonlinear"},{"factor":"Precipitation / cold weather dampener","impact_pct":-2.7,"category":"weather"}]},"models":{"SeasonalNaive364":10298.0,"LogMSTL_ETS":12745.7,"Ridge_AR_Exo":13156.5,"MLForecast_LGBM":12287.2,"Hybrid_Ridge_CatBoost":12388.8}},{"ds":"2026-11-24","dow":"Tuesday","dow_short":"Tue","date_short":"Nov 24","is_weekend":false,"is_bridge_gap":false,"ensemble":12391,"pi80_low":11242,"pi80_high":13469,"pi95_low":10483,"pi95_high":14444,"west_entrance":6568,"east_entrance":5823,"mountain_ave":1698,"west_share_pct":53.0,"dow_seasonal_norm":10894,"vs_dow_norm_pct":13.7,"overall_percentile":49.2,"daytype_percentile":60.3,"signal_overall":"Good day to visit","tone_overall":"good","signal_daytype":"Busy for this day type","tone_daytype":"warning","traffic_score_overall":50.8,"traffic_score_daytype":39.7,"weather_score":86.0,"weather_label":"Light drizzle","weather_icon":"drizzle","temp_max_c":0.6,"temp_min_c":-3.9,"precip_prob_pct":2.0,"precip_mm":0.3,"snowfall_cm":0.0,"wind_max_kmh":7.0,"visit_score_quiet":50.8,"visit_score_balanced":63.1,"visit_score_weather":73.7,"visit_score_scoped_balanced":55.9,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":-5.9,"regime_pct":6.1,"nonlinear_pct":-2.3,"drivers":[{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":6.1,"category":"macro"},{"factor":"Precipitation / cold weather dampener","impact_pct":-5.9,"category":"weather"},{"factor":"Tree & MSTL non-linear seasonal adjustment","impact_pct":-2.3,"category":"nonlinear"}]},"models":{"SeasonalNaive364":12018.0,"LogMSTL_ETS":11694.0,"Ridge_AR_Exo":12684.6,"MLForecast_LGBM":12073.6,"Hybrid_Ridge_CatBoost":12539.1}},{"ds":"2026-11-25","dow":"Wednesday","dow_short":"Wed","date_short":"Nov 25","is_weekend":false,"is_bridge_gap":false,"ensemble":13096,"pi80_low":11872,"pi80_high":14249,"pi95_low":11063,"pi95_high":15290,"west_entrance":6942,"east_entrance":6154,"mountain_ave":1795,"west_share_pct":53.0,"dow_seasonal_norm":11075,"vs_dow_norm_pct":18.2,"overall_percentile":55.6,"daytype_percentile":67.7,"signal_overall":"Busy day","tone_overall":"warning","signal_daytype":"Busy for this day type","tone_daytype":"warning","traffic_score_overall":44.4,"traffic_score_daytype":32.3,"weather_score":94.5,"weather_label":"Overcast","weather_icon":"cloud","temp_max_c":4.3,"temp_min_c":-4.6,"precip_prob_pct":9.0,"precip_mm":0.0,"snowfall_cm":0.0,"wind_max_kmh":9.0,"visit_score_quiet":44.4,"visit_score_balanced":61.9,"visit_score_weather":77.0,"visit_score_scoped_balanced":54.1,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":-3.7,"regime_pct":6.2,"nonlinear_pct":-0.9,"drivers":[{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":6.2,"category":"macro"},{"factor":"Precipitation / cold weather dampener","impact_pct":-3.7,"category":"weather"}]},"models":{"SeasonalNaive364":12478.0,"LogMSTL_ETS":13454.7,"Ridge_AR_Exo":13212.7,"MLForecast_LGBM":12867.2,"Hybrid_Ridge_CatBoost":13131.4}},{"ds":"2026-11-26","dow":"Thursday","dow_short":"Thu","date_short":"Nov 26","is_weekend":false,"is_bridge_gap":false,"ensemble":13580,"pi80_low":12300,"pi80_high":14788,"pi95_low":11455,"pi95_high":15880,"west_entrance":7199,"east_entrance":6381,"mountain_ave":1861,"west_share_pct":53.0,"dow_seasonal_norm":11810,"vs_dow_norm_pct":15.0,"overall_percentile":58.7,"daytype_percentile":75.8,"signal_overall":"Busy day","tone_overall":"warning","signal_daytype":"Busy for this day type","tone_daytype":"warning","traffic_score_overall":41.3,"traffic_score_daytype":24.2,"weather_score":94.5,"weather_label":"Overcast","weather_icon":"cloud","temp_max_c":1.8,"temp_min_c":-5.7,"precip_prob_pct":12.0,"precip_mm":0.0,"snowfall_cm":0.0,"wind_max_kmh":11.0,"visit_score_quiet":41.3,"visit_score_balanced":59.9,"visit_score_weather":75.9,"visit_score_scoped_balanced":48.8,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":-5.0,"regime_pct":6.2,"nonlinear_pct":0.0,"drivers":[{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":6.2,"category":"macro"},{"factor":"Precipitation / cold weather dampener","impact_pct":-5.0,"category":"weather"}]},"models":{"SeasonalNaive364":12718.0,"LogMSTL_ETS":12949.2,"Ridge_AR_Exo":13575.5,"MLForecast_LGBM":13515.3,"Hybrid_Ridge_CatBoost":13693.4}},{"ds":"2026-11-27","dow":"Friday","dow_short":"Fri","date_short":"Nov 27","is_weekend":false,"is_bridge_gap":false,"ensemble":14400,"pi80_low":13032,"pi80_high":15694,"pi95_low":12128,"pi95_high":16864,"west_entrance":7634,"east_entrance":6766,"mountain_ave":1973,"west_share_pct":53.0,"dow_seasonal_norm":14514,"vs_dow_norm_pct":-0.8,"overall_percentile":63.5,"daytype_percentile":87.3,"signal_overall":"Busy day","tone_overall":"warning","signal_daytype":"Heavy crowds for this day type","tone_daytype":"bad","traffic_score_overall":36.5,"traffic_score_daytype":12.7,"weather_score":80.7,"weather_label":"Moderate snow","weather_icon":"snow","temp_max_c":-1.0,"temp_min_c":-4.8,"precip_prob_pct":16.0,"precip_mm":3.3,"snowfall_cm":2.3,"wind_max_kmh":9.0,"visit_score_quiet":36.5,"visit_score_balanced":52.0,"visit_score_weather":65.2,"visit_score_scoped_balanced":36.5,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":-11.5,"regime_pct":6.3,"nonlinear_pct":2.8,"drivers":[{"factor":"Precipitation / cold weather dampener","impact_pct":-11.5,"category":"weather"},{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":6.3,"category":"macro"},{"factor":"Tree & MSTL non-linear seasonal adjustment","impact_pct":2.8,"category":"nonlinear"}]},"models":{"SeasonalNaive364":14912.0,"LogMSTL_ETS":13685.0,"Ridge_AR_Exo":14006.6,"MLForecast_LGBM":14579.5,"Hybrid_Ridge_CatBoost":14540.0}},{"ds":"2026-11-28","dow":"Saturday","dow_short":"Sat","date_short":"Nov 28","is_weekend":true,"is_bridge_gap":false,"ensemble":17081,"pi80_low":14937,"pi80_high":19266,"pi95_low":13626,"pi95_high":21119,"west_entrance":9024,"east_entrance":8057,"mountain_ave":2920,"west_share_pct":52.8,"dow_seasonal_norm":16850,"vs_dow_norm_pct":1.4,"overall_percentile":93.7,"daytype_percentile":79.2,"signal_overall":"Avoid if possible","tone_overall":"bad","signal_daytype":"Busy for this day type","tone_daytype":"warning","traffic_score_overall":6.3,"traffic_score_daytype":20.8,"weather_score":81.3,"weather_label":"Moderate snow","weather_icon":"snow","temp_max_c":1.2,"temp_min_c":-7.3,"precip_prob_pct":16.0,"precip_mm":0.3,"snowfall_cm":0.2,"wind_max_kmh":8.0,"visit_score_quiet":6.3,"visit_score_balanced":32.6,"visit_score_weather":55.0,"visit_score_scoped_balanced":42.0,"event_label":"","driver_attributions":{"holiday_pct":0.0,"weather_pct":-6.5,"regime_pct":6.3,"nonlinear_pct":3.0,"drivers":[{"factor":"Precipitation / cold weather dampener","impact_pct":-6.5,"category":"weather"},{"factor":"Elevated recent demand & FX/tourism regime","impact_pct":6.3,"category":"macro"},{"factor":"Tree & MSTL non-linear seasonal adjustment","impact_pct":3.0,"category":"nonlinear"}]},"models":{"SeasonalNaive364":16820.0,"LogMSTL_ETS":14836.4,"Ridge_AR_Exo":16576.7,"MLForecast_LGBM":17107.1,"Hybrid_Ridge_CatBoost":17546.7}}],"annual_planner":{"daily_profile_365":[{"month":1,"day":1,"doy":1,"date_label":"Jan 01","avg_vehicles":16864,"p25_vehicles":16074,"p75_vehicles":17737,"temp_max_c":-2.7,"temp_min_c":-10.3,"precip_mm":0.3,"season_tag":"Christmas & New Year Peak"},{"month":1,"day":2,"doy":2,"date_label":"Jan 02","avg_vehicles":16259,"p25_vehicles":15604,"p75_vehicles":16989,"temp_max_c":-2.7,"temp_min_c":-10.3,"precip_mm":0.2,"season_tag":"Christmas & New Year Peak"},{"month":1,"day":3,"doy":3,"date_label":"Jan 03","avg_vehicles":15520,"p25_vehicles":14951,"p75_vehicles":16116,"temp_max_c":-2.5,"temp_min_c":-10.3,"precip_mm":0.2,"season_tag":"Christmas & New Year Peak"},{"month":1,"day":4,"doy":4,"date_label":"Jan 04","avg_vehicles":14837,"p25_vehicles":14295,"p75_vehicles":15373,"temp_max_c":-2.5,"temp_min_c":-10.4,"precip_mm":0.3,"season_tag":"Winter & Ski Season"},{"month":1,"day":5,"doy":5,"date_label":"Jan 05","avg_vehicles":14214,"p25_vehicles":13594,"p75_vehicles":14828,"temp_max_c":-2.6,"temp_min_c":-10.7,"precip_mm":0.3,"season_tag":"Winter & Ski Season"},{"month":1,"day":6,"doy":6,"date_label":"Jan 06","avg_vehicles":13788,"p25_vehicles":13074,"p75_vehicles":14582,"temp_max_c":-3.0,"temp_min_c":-11.1,"precip_mm":0.3,"season_tag":"Winter & Ski Season"},{"month":1,"day":7,"doy":7,"date_label":"Jan 07","avg_vehicles":13316,"p25_vehicles":12507,"p75_vehicles":14201,"temp_max_c":-3.3,"temp_min_c":-11.6,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":1,"day":8,"doy":8,"date_label":"Jan 08","avg_vehicles":12706,"p25_vehicles":11860,"p75_vehicles":13656,"temp_max_c":-3.5,"temp_min_c":-12.1,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":1,"day":9,"doy":9,"date_label":"Jan 09","avg_vehicles":12288,"p25_vehicles":11376,"p75_vehicles":13313,"temp_max_c":-3.8,"temp_min_c":-12.1,"precip_mm":0.3,"season_tag":"Winter & Ski Season"},{"month":1,"day":10,"doy":10,"date_label":"Jan 10","avg_vehicles":11940,"p25_vehicles":10990,"p75_vehicles":12984,"temp_max_c":-4.1,"temp_min_c":-12.8,"precip_mm":0.3,"season_tag":"Winter & Ski Season"},{"month":1,"day":11,"doy":11,"date_label":"Jan 11","avg_vehicles":11824,"p25_vehicles":10822,"p75_vehicles":12901,"temp_max_c":-4.5,"temp_min_c":-13.4,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":1,"day":12,"doy":12,"date_label":"Jan 12","avg_vehicles":12076,"p25_vehicles":10826,"p75_vehicles":13381,"temp_max_c":-4.9,"temp_min_c":-13.8,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":1,"day":13,"doy":13,"date_label":"Jan 13","avg_vehicles":12485,"p25_vehicles":11089,"p75_vehicles":14048,"temp_max_c":-5.4,"temp_min_c":-14.5,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":1,"day":14,"doy":14,"date_label":"Jan 14","avg_vehicles":12765,"p25_vehicles":11322,"p75_vehicles":14324,"temp_max_c":-5.8,"temp_min_c":-15.1,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":1,"day":15,"doy":15,"date_label":"Jan 15","avg_vehicles":12945,"p25_vehicles":11372,"p75_vehicles":14549,"temp_max_c":-5.9,"temp_min_c":-15.7,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":1,"day":16,"doy":16,"date_label":"Jan 16","avg_vehicles":12918,"p25_vehicles":11405,"p75_vehicles":14417,"temp_max_c":-6.0,"temp_min_c":-15.9,"precip_mm":0.3,"season_tag":"Winter & Ski Season"},{"month":1,"day":17,"doy":17,"date_label":"Jan 17","avg_vehicles":12815,"p25_vehicles":11397,"p75_vehicles":14170,"temp_max_c":-5.8,"temp_min_c":-16.1,"precip_mm":0.3,"season_tag":"Winter & Ski Season"},{"month":1,"day":18,"doy":18,"date_label":"Jan 18","avg_vehicles":12928,"p25_vehicles":11569,"p75_vehicles":14233,"temp_max_c":-5.4,"temp_min_c":-15.6,"precip_mm":0.2,"season_tag":"Winter & Ski Season"},{"month":1,"day":19,"doy":19,"date_label":"Jan 19","avg_vehicles":13237,"p25_vehicles":11875,"p75_vehicles":14558,"temp_max_c":-5.0,"temp_min_c":-15.0,"precip_mm":0.2,"season_tag":"Winter & Ski Season"},{"month":1,"day":20,"doy":20,"date_label":"Jan 20","avg_vehicles":13615,"p25_vehicles":12189,"p75_vehicles":14972,"temp_max_c":-4.6,"temp_min_c":-14.7,"precip_mm":0.2,"season_tag":"Winter & Ski Season"},{"month":1,"day":21,"doy":21,"date_label":"Jan 21","avg_vehicles":13893,"p25_vehicles":12423,"p75_vehicles":15270,"temp_max_c":-4.3,"temp_min_c":-14.2,"precip_mm":0.2,"season_tag":"Winter & Ski Season"},{"month":1,"day":22,"doy":22,"date_label":"Jan 22","avg_vehicles":14046,"p25_vehicles":12556,"p75_vehicles":15411,"temp_max_c":-3.8,"temp_min_c":-13.7,"precip_mm":0.2,"season_tag":"Winter & Ski Season"},{"month":1,"day":23,"doy":23,"date_label":"Jan 23","avg_vehicles":13801,"p25_vehicles":12570,"p75_vehicles":14932,"temp_max_c":-3.1,"temp_min_c":-13.0,"precip_mm":0.0,"season_tag":"Winter & Ski Season"},{"month":1,"day":24,"doy":24,"date_label":"Jan 24","avg_vehicles":13447,"p25_vehicles":12346,"p75_vehicles":14352,"temp_max_c":-1.6,"temp_min_c":-11.3,"precip_mm":0.0,"season_tag":"Winter & Ski Season"},{"month":1,"day":25,"doy":25,"date_label":"Jan 25","avg_vehicles":13355,"p25_vehicles":12251,"p75_vehicles":14295,"temp_max_c":-0.2,"temp_min_c":-9.5,"precip_mm":0.0,"season_tag":"Winter & Ski Season"},{"month":1,"day":26,"doy":26,"date_label":"Jan 26","avg_vehicles":13374,"p25_vehicles":12321,"p75_vehicles":14350,"temp_max_c":0.6,"temp_min_c":-8.1,"precip_mm":0.0,"season_tag":"Winter & Ski Season"},{"month":1,"day":27,"doy":27,"date_label":"Jan 27","avg_vehicles":13541,"p25_vehicles":12481,"p75_vehicles":14562,"temp_max_c":1.5,"temp_min_c":-7.5,"precip_mm":0.1,"season_tag":"Winter & Ski Season"},{"month":1,"day":28,"doy":28,"date_label":"Jan 28","avg_vehicles":13657,"p25_vehicles":12577,"p75_vehicles":14658,"temp_max_c":1.7,"temp_min_c":-7.1,"precip_mm":0.1,"season_tag":"Winter & Ski Season"},{"month":1,"day":29,"doy":29,"date_label":"Jan 29","avg_vehicles":13682,"p25_vehicles":12553,"p75_vehicles":14716,"temp_max_c":1.6,"temp_min_c":-7.1,"precip_mm":0.3,"season_tag":"Winter & Ski Season"},{"month":1,"day":30,"doy":30,"date_label":"Jan 30","avg_vehicles":13522,"p25_vehicles":12403,"p75_vehicles":14543,"temp_max_c":1.4,"temp_min_c":-7.1,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":1,"day":31,"doy":31,"date_label":"Jan 31","avg_vehicles":13224,"p25_vehicles":12165,"p75_vehicles":14168,"temp_max_c":1.5,"temp_min_c":-7.0,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":2,"day":1,"doy":32,"date_label":"Feb 01","avg_vehicles":13088,"p25_vehicles":12012,"p75_vehicles":14018,"temp_max_c":1.7,"temp_min_c":-7.1,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":2,"day":2,"doy":33,"date_label":"Feb 02","avg_vehicles":13141,"p25_vehicles":12064,"p75_vehicles":14125,"temp_max_c":1.6,"temp_min_c":-7.4,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":2,"day":3,"doy":34,"date_label":"Feb 03","avg_vehicles":13238,"p25_vehicles":12202,"p75_vehicles":14273,"temp_max_c":1.4,"temp_min_c":-7.9,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":2,"day":4,"doy":35,"date_label":"Feb 04","avg_vehicles":13307,"p25_vehicles":12240,"p75_vehicles":14332,"temp_max_c":0.6,"temp_min_c":-9.0,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":2,"day":5,"doy":36,"date_label":"Feb 05","avg_vehicles":13292,"p25_vehicles":12171,"p75_vehicles":14323,"temp_max_c":-0.3,"temp_min_c":-10.2,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":2,"day":6,"doy":37,"date_label":"Feb 06","avg_vehicles":13089,"p25_vehicles":12088,"p75_vehicles":14011,"temp_max_c":-1.0,"temp_min_c":-11.1,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":2,"day":7,"doy":38,"date_label":"Feb 07","avg_vehicles":12882,"p25_vehicles":11850,"p75_vehicles":13780,"temp_max_c":-1.5,"temp_min_c":-11.7,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":2,"day":8,"doy":39,"date_label":"Feb 08","avg_vehicles":12987,"p25_vehicles":11861,"p75_vehicles":13979,"temp_max_c":-1.5,"temp_min_c":-11.9,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":2,"day":9,"doy":40,"date_label":"Feb 09","avg_vehicles":13357,"p25_vehicles":12124,"p75_vehicles":14426,"temp_max_c":-1.7,"temp_min_c":-12.3,"precip_mm":0.3,"season_tag":"Winter & Ski Season"},{"month":2,"day":10,"doy":41,"date_label":"Feb 10","avg_vehicles":13926,"p25_vehicles":12505,"p75_vehicles":15148,"temp_max_c":-1.7,"temp_min_c":-13.1,"precip_mm":0.1,"season_tag":"Winter & Ski Season"},{"month":2,"day":11,"doy":42,"date_label":"Feb 11","avg_vehicles":14447,"p25_vehicles":13054,"p75_vehicles":15691,"temp_max_c":-2.0,"temp_min_c":-13.7,"precip_mm":0.2,"season_tag":"Winter & Ski Season"},{"month":2,"day":12,"doy":43,"date_label":"Feb 12","avg_vehicles":14753,"p25_vehicles":13375,"p75_vehicles":16062,"temp_max_c":-2.4,"temp_min_c":-14.7,"precip_mm":0.3,"season_tag":"Winter & Ski Season"},{"month":2,"day":13,"doy":44,"date_label":"Feb 13","avg_vehicles":14931,"p25_vehicles":13524,"p75_vehicles":16212,"temp_max_c":-3.1,"temp_min_c":-15.5,"precip_mm":0.3,"season_tag":"Winter & Ski Season"},{"month":2,"day":14,"doy":45,"date_label":"Feb 14","avg_vehicles":15096,"p25_vehicles":13616,"p75_vehicles":16350,"temp_max_c":-3.2,"temp_min_c":-16.2,"precip_mm":0.3,"season_tag":"Winter & Ski Season"},{"month":2,"day":15,"doy":46,"date_label":"Feb 15","avg_vehicles":15301,"p25_vehicles":13852,"p75_vehicles":16557,"temp_max_c":-2.8,"temp_min_c":-16.0,"precip_mm":0.3,"season_tag":"Winter & Ski Season"},{"month":2,"day":16,"doy":47,"date_label":"Feb 16","avg_vehicles":15550,"p25_vehicles":14185,"p75_vehicles":16764,"temp_max_c":-2.3,"temp_min_c":-15.4,"precip_mm":0.3,"season_tag":"Winter & Ski Season"},{"month":2,"day":17,"doy":48,"date_label":"Feb 17","avg_vehicles":15901,"p25_vehicles":14411,"p75_vehicles":17180,"temp_max_c":-1.7,"temp_min_c":-15.1,"precip_mm":0.3,"season_tag":"Winter & Ski Season"},{"month":2,"day":18,"doy":49,"date_label":"Feb 18","avg_vehicles":16128,"p25_vehicles":14658,"p75_vehicles":17479,"temp_max_c":-1.3,"temp_min_c":-14.2,"precip_mm":0.4,"season_tag":"Winter & Ski Season"},{"month":2,"day":19,"doy":50,"date_label":"Feb 19","avg_vehicles":16097,"p25_vehicles":14659,"p75_vehicles":17391,"temp_max_c":-0.8,"temp_min_c":-13.5,"precip_mm":0.5,"season_tag":"Winter & Ski Season"},{"month":2,"day":20,"doy":51,"date_label":"Feb 20","avg_vehicles":15741,"p25_vehicles":14490,"p75_vehicles":16889,"temp_max_c":0.0,"temp_min_c":-12.5,"precip_mm":0.6,"season_tag":"Winter & Ski Season"},{"month":2,"day":21,"doy":52,"date_label":"Feb 21","avg_vehicles":15214,"p25_vehicles":14155,"p75_vehicles":16197,"temp_max_c":0.7,"temp_min_c":-11.4,"precip_mm":0.7,"season_tag":"Winter & Ski Season"},{"month":2,"day":22,"doy":53,"date_label":"Feb 22","avg_vehicles":14780,"p25_vehicles":13748,"p75_vehicles":15767,"temp_max_c":1.1,"temp_min_c":-10.8,"precip_mm":0.9,"season_tag":"Winter & Ski Season"},{"month":2,"day":23,"doy":54,"date_label":"Feb 23","avg_vehicles":14553,"p25_vehicles":13435,"p75_vehicles":15577,"temp_max_c":1.5,"temp_min_c":-9.7,"precip_mm":1.2,"season_tag":"Winter & Ski Season"},{"month":2,"day":24,"doy":55,"date_label":"Feb 24","avg_vehicles":14498,"p25_vehicles":13416,"p75_vehicles":15525,"temp_max_c":2.5,"temp_min_c":-8.7,"precip_mm":1.3,"season_tag":"Winter & Ski Season"},{"month":2,"day":25,"doy":56,"date_label":"Feb 25","avg_vehicles":14321,"p25_vehicles":13256,"p75_vehicles":15347,"temp_max_c":2.9,"temp_min_c":-7.9,"precip_mm":1.3,"season_tag":"Winter & Ski Season"},{"month":2,"day":26,"doy":57,"date_label":"Feb 26","avg_vehicles":14048,"p25_vehicles":12976,"p75_vehicles":15087,"temp_max_c":2.8,"temp_min_c":-7.6,"precip_mm":1.4,"season_tag":"Winter & Ski Season"},{"month":2,"day":27,"doy":58,"date_label":"Feb 27","avg_vehicles":13720,"p25_vehicles":12667,"p75_vehicles":14777,"temp_max_c":2.6,"temp_min_c":-7.8,"precip_mm":1.4,"season_tag":"Winter & Ski Season"},{"month":2,"day":28,"doy":59,"date_label":"Feb 28","avg_vehicles":13397,"p25_vehicles":12418,"p75_vehicles":14412,"temp_max_c":2.0,"temp_min_c":-8.0,"precip_mm":1.5,"season_tag":"Winter & Ski Season"},{"month":3,"day":1,"doy":60,"date_label":"Mar 01","avg_vehicles":13355,"p25_vehicles":12369,"p75_vehicles":14308,"temp_max_c":1.8,"temp_min_c":-8.8,"precip_mm":1.3,"season_tag":"Winter & Ski Season"},{"month":3,"day":2,"doy":61,"date_label":"Mar 02","avg_vehicles":13543,"p25_vehicles":12576,"p75_vehicles":14536,"temp_max_c":1.9,"temp_min_c":-9.2,"precip_mm":1.3,"season_tag":"Winter & Ski Season"},{"month":3,"day":3,"doy":62,"date_label":"Mar 03","avg_vehicles":13806,"p25_vehicles":12759,"p75_vehicles":14838,"temp_max_c":2.1,"temp_min_c":-9.4,"precip_mm":1.2,"season_tag":"Winter & Ski Season"},{"month":3,"day":4,"doy":63,"date_label":"Mar 04","avg_vehicles":14071,"p25_vehicles":13008,"p75_vehicles":15111,"temp_max_c":2.2,"temp_min_c":-9.2,"precip_mm":1.3,"season_tag":"Winter & Ski Season"},{"month":3,"day":5,"doy":64,"date_label":"Mar 05","avg_vehicles":14169,"p25_vehicles":13119,"p75_vehicles":15145,"temp_max_c":2.3,"temp_min_c":-8.6,"precip_mm":1.2,"season_tag":"Winter & Ski Season"},{"month":3,"day":6,"doy":65,"date_label":"Mar 06","avg_vehicles":14139,"p25_vehicles":13258,"p75_vehicles":14941,"temp_max_c":2.3,"temp_min_c":-8.2,"precip_mm":0.9,"season_tag":"Winter & Ski Season"},{"month":3,"day":7,"doy":66,"date_label":"Mar 07","avg_vehicles":13879,"p25_vehicles":13123,"p75_vehicles":14597,"temp_max_c":2.3,"temp_min_c":-7.8,"precip_mm":1.3,"season_tag":"Winter & Ski Season"},{"month":3,"day":8,"doy":67,"date_label":"Mar 08","avg_vehicles":13855,"p25_vehicles":13140,"p75_vehicles":14535,"temp_max_c":2.1,"temp_min_c":-7.9,"precip_mm":1.5,"season_tag":"Winter & Ski Season"},{"month":3,"day":9,"doy":68,"date_label":"Mar 09","avg_vehicles":14115,"p25_vehicles":13370,"p75_vehicles":14833,"temp_max_c":2.0,"temp_min_c":-8.2,"precip_mm":1.5,"season_tag":"Winter & Ski Season"},{"month":3,"day":10,"doy":69,"date_label":"Mar 10","avg_vehicles":14449,"p25_vehicles":13715,"p75_vehicles":15128,"temp_max_c":2.3,"temp_min_c":-8.4,"precip_mm":1.5,"season_tag":"Winter & Ski Season"},{"month":3,"day":11,"doy":70,"date_label":"Mar 11","avg_vehicles":14755,"p25_vehicles":13999,"p75_vehicles":15447,"temp_max_c":3.1,"temp_min_c":-8.2,"precip_mm":1.5,"season_tag":"Winter & Ski Season"},{"month":3,"day":12,"doy":71,"date_label":"Mar 12","avg_vehicles":14830,"p25_vehicles":14099,"p75_vehicles":15499,"temp_max_c":3.7,"temp_min_c":-7.6,"precip_mm":1.5,"season_tag":"Winter & Ski Season"},{"month":3,"day":13,"doy":72,"date_label":"Mar 13","avg_vehicles":14674,"p25_vehicles":13993,"p75_vehicles":15271,"temp_max_c":4.1,"temp_min_c":-7.2,"precip_mm":1.6,"season_tag":"Winter & Ski Season"},{"month":3,"day":14,"doy":73,"date_label":"Mar 14","avg_vehicles":14514,"p25_vehicles":13901,"p75_vehicles":15085,"temp_max_c":4.1,"temp_min_c":-7.0,"precip_mm":1.9,"season_tag":"Winter & Ski Season"},{"month":3,"day":15,"doy":74,"date_label":"Mar 15","avg_vehicles":14367,"p25_vehicles":13700,"p75_vehicles":14987,"temp_max_c":4.2,"temp_min_c":-6.7,"precip_mm":2.4,"season_tag":"Winter & Ski Season"},{"month":3,"day":16,"doy":75,"date_label":"Mar 16","avg_vehicles":14439,"p25_vehicles":13730,"p75_vehicles":15179,"temp_max_c":4.2,"temp_min_c":-6.6,"precip_mm":2.2,"season_tag":"Winter & Ski Season"},{"month":3,"day":17,"doy":76,"date_label":"Mar 17","avg_vehicles":14715,"p25_vehicles":13958,"p75_vehicles":15567,"temp_max_c":4.3,"temp_min_c":-6.9,"precip_mm":2.1,"season_tag":"Winter & Ski Season"},{"month":3,"day":18,"doy":77,"date_label":"Mar 18","avg_vehicles":14941,"p25_vehicles":14155,"p75_vehicles":15824,"temp_max_c":4.2,"temp_min_c":-7.0,"precip_mm":1.7,"season_tag":"Winter & Ski Season"},{"month":3,"day":19,"doy":78,"date_label":"Mar 19","avg_vehicles":15018,"p25_vehicles":14243,"p75_vehicles":15942,"temp_max_c":4.5,"temp_min_c":-6.7,"precip_mm":1.7,"season_tag":"Winter & Ski Season"},{"month":3,"day":20,"doy":79,"date_label":"Mar 20","avg_vehicles":14919,"p25_vehicles":14138,"p75_vehicles":15839,"temp_max_c":5.1,"temp_min_c":-6.2,"precip_mm":1.8,"season_tag":"Winter & Ski Season"},{"month":3,"day":21,"doy":80,"date_label":"Mar 21","avg_vehicles":14857,"p25_vehicles":14040,"p75_vehicles":15798,"temp_max_c":5.3,"temp_min_c":-5.8,"precip_mm":1.8,"season_tag":"Winter & Ski Season"},{"month":3,"day":22,"doy":81,"date_label":"Mar 22","avg_vehicles":14874,"p25_vehicles":14115,"p75_vehicles":15768,"temp_max_c":5.0,"temp_min_c":-5.6,"precip_mm":2.1,"season_tag":"Winter & Ski Season"},{"month":3,"day":23,"doy":82,"date_label":"Mar 23","avg_vehicles":14978,"p25_vehicles":14220,"p75_vehicles":15850,"temp_max_c":4.4,"temp_min_c":-5.6,"precip_mm":2.2,"season_tag":"Winter & Ski Season"},{"month":3,"day":24,"doy":83,"date_label":"Mar 24","avg_vehicles":15100,"p25_vehicles":14260,"p75_vehicles":16007,"temp_max_c":3.6,"temp_min_c":-6.0,"precip_mm":2.6,"season_tag":"Winter & Ski Season"},{"month":3,"day":25,"doy":84,"date_label":"Mar 25","avg_vehicles":15287,"p25_vehicles":14351,"p75_vehicles":16268,"temp_max_c":3.3,"temp_min_c":-6.8,"precip_mm":2.2,"season_tag":"Winter & Ski Season"},{"month":3,"day":26,"doy":85,"date_label":"Mar 26","avg_vehicles":15414,"p25_vehicles":14487,"p75_vehicles":16343,"temp_max_c":3.4,"temp_min_c":-7.6,"precip_mm":1.7,"season_tag":"Winter & Ski Season"},{"month":3,"day":27,"doy":86,"date_label":"Mar 27","avg_vehicles":15364,"p25_vehicles":14484,"p75_vehicles":16204,"temp_max_c":3.8,"temp_min_c":-7.7,"precip_mm":1.6,"season_tag":"Winter & Ski Season"},{"month":3,"day":28,"doy":87,"date_label":"Mar 28","avg_vehicles":15057,"p25_vehicles":14239,"p75_vehicles":15809,"temp_max_c":4.1,"temp_min_c":-7.2,"precip_mm":1.7,"season_tag":"Winter & Ski Season"},{"month":3,"day":29,"doy":88,"date_label":"Mar 29","avg_vehicles":14985,"p25_vehicles":14058,"p75_vehicles":15771,"temp_max_c":4.4,"temp_min_c":-7.0,"precip_mm":2.0,"season_tag":"Winter & Ski Season"},{"month":3,"day":30,"doy":89,"date_label":"Mar 30","avg_vehicles":15093,"p25_vehicles":14006,"p75_vehicles":16020,"temp_max_c":4.5,"temp_min_c":-6.8,"precip_mm":1.9,"season_tag":"Winter & Ski Season"},{"month":3,"day":31,"doy":90,"date_label":"Mar 31","avg_vehicles":15227,"p25_vehicles":14080,"p75_vehicles":16228,"temp_max_c":4.6,"temp_min_c":-6.4,"precip_mm":1.9,"season_tag":"Winter & Ski Season"},{"month":4,"day":1,"doy":91,"date_label":"Apr 01","avg_vehicles":15241,"p25_vehicles":14041,"p75_vehicles":16283,"temp_max_c":5.4,"temp_min_c":-5.8,"precip_mm":1.7,"season_tag":"Winter & Ski Season"},{"month":4,"day":2,"doy":92,"date_label":"Apr 02","avg_vehicles":14991,"p25_vehicles":13816,"p75_vehicles":16019,"temp_max_c":5.9,"temp_min_c":-5.3,"precip_mm":1.6,"season_tag":"Winter & Ski Season"},{"month":4,"day":3,"doy":93,"date_label":"Apr 03","avg_vehicles":14689,"p25_vehicles":13506,"p75_vehicles":15772,"temp_max_c":6.4,"temp_min_c":-5.1,"precip_mm":1.5,"season_tag":"Winter & Ski Season"},{"month":4,"day":4,"doy":94,"date_label":"Apr 04","avg_vehicles":14477,"p25_vehicles":13322,"p75_vehicles":15593,"temp_max_c":7.3,"temp_min_c":-4.7,"precip_mm":1.0,"season_tag":"Winter & Ski Season"},{"month":4,"day":5,"doy":95,"date_label":"Apr 05","avg_vehicles":14300,"p25_vehicles":13159,"p75_vehicles":15374,"temp_max_c":8.1,"temp_min_c":-4.0,"precip_mm":0.9,"season_tag":"Winter & Ski Season"},{"month":4,"day":6,"doy":96,"date_label":"Apr 06","avg_vehicles":14335,"p25_vehicles":13193,"p75_vehicles":15478,"temp_max_c":8.6,"temp_min_c":-3.2,"precip_mm":0.9,"season_tag":"Winter & Ski Season"},{"month":4,"day":7,"doy":97,"date_label":"Apr 07","avg_vehicles":14329,"p25_vehicles":13160,"p75_vehicles":15469,"temp_max_c":8.6,"temp_min_c":-2.8,"precip_mm":1.2,"season_tag":"Winter & Ski Season"},{"month":4,"day":8,"doy":98,"date_label":"Apr 08","avg_vehicles":14519,"p25_vehicles":13302,"p75_vehicles":15708,"temp_max_c":9.2,"temp_min_c":-2.9,"precip_mm":1.1,"season_tag":"Winter & Ski Season"},{"month":4,"day":9,"doy":99,"date_label":"Apr 09","avg_vehicles":14421,"p25_vehicles":13331,"p75_vehicles":15563,"temp_max_c":9.8,"temp_min_c":-2.7,"precip_mm":0.8,"season_tag":"Winter & Ski Season"},{"month":4,"day":10,"doy":100,"date_label":"Apr 10","avg_vehicles":14124,"p25_vehicles":13194,"p75_vehicles":15078,"temp_max_c":10.3,"temp_min_c":-2.5,"precip_mm":0.7,"season_tag":"Winter & Ski Season"},{"month":4,"day":11,"doy":101,"date_label":"Apr 11","avg_vehicles":13766,"p25_vehicles":12884,"p75_vehicles":14623,"temp_max_c":9.9,"temp_min_c":-2.6,"precip_mm":1.1,"season_tag":"Winter & Ski Season"},{"month":4,"day":12,"doy":102,"date_label":"Apr 12","avg_vehicles":13662,"p25_vehicles":12814,"p75_vehicles":14553,"temp_max_c":9.2,"temp_min_c":-3.1,"precip_mm":1.1,"season_tag":"Winter & Ski Season"},{"month":4,"day":13,"doy":103,"date_label":"Apr 13","avg_vehicles":14131,"p25_vehicles":12984,"p75_vehicles":15264,"temp_max_c":9.2,"temp_min_c":-3.7,"precip_mm":1.0,"season_tag":"Winter & Ski Season"},{"month":4,"day":14,"doy":104,"date_label":"Apr 14","avg_vehicles":14600,"p25_vehicles":13320,"p75_vehicles":15778,"temp_max_c":9.3,"temp_min_c":-3.8,"precip_mm":1.0,"season_tag":"Winter & Ski Season"},{"month":4,"day":15,"doy":105,"date_label":"Apr 15","avg_vehicles":14980,"p25_vehicles":13726,"p75_vehicles":16175,"temp_max_c":9.7,"temp_min_c":-3.8,"precip_mm":1.0,"season_tag":"Winter & Ski Season"},{"month":4,"day":16,"doy":106,"date_label":"Apr 16","avg_vehicles":15029,"p25_vehicles":13892,"p75_vehicles":16169,"temp_max_c":9.5,"temp_min_c":-3.6,"precip_mm":1.1,"season_tag":"Winter & Ski Season"},{"month":4,"day":17,"doy":107,"date_label":"Apr 17","avg_vehicles":14831,"p25_vehicles":13723,"p75_vehicles":15865,"temp_max_c":9.4,"temp_min_c":-3.7,"precip_mm":1.4,"season_tag":"Winter & Ski Season"},{"month":4,"day":18,"doy":108,"date_label":"Apr 18","avg_vehicles":14826,"p25_vehicles":13723,"p75_vehicles":15849,"temp_max_c":9.5,"temp_min_c":-4.3,"precip_mm":1.2,"season_tag":"Winter & Ski Season"},{"month":4,"day":19,"doy":109,"date_label":"Apr 19","avg_vehicles":14798,"p25_vehicles":13698,"p75_vehicles":15792,"temp_max_c":9.4,"temp_min_c":-4.4,"precip_mm":1.2,"season_tag":"Winter & Ski Season"},{"month":4,"day":20,"doy":110,"date_label":"Apr 20","avg_vehicles":14950,"p25_vehicles":13826,"p75_vehicles":15972,"temp_max_c":9.2,"temp_min_c":-4.4,"precip_mm":1.2,"season_tag":"Winter & Ski Season"},{"month":4,"day":21,"doy":111,"date_label":"Apr 21","avg_vehicles":15320,"p25_vehicles":14081,"p75_vehicles":16398,"temp_max_c":9.0,"temp_min_c":-4.5,"precip_mm":1.3,"season_tag":"Winter & Ski Season"},{"month":4,"day":22,"doy":112,"date_label":"Apr 22","avg_vehicles":15690,"p25_vehicles":14462,"p75_vehicles":16757,"temp_max_c":9.7,"temp_min_c":-4.4,"precip_mm":1.0,"season_tag":"Winter & Ski Season"},{"month":4,"day":23,"doy":113,"date_label":"Apr 23","avg_vehicles":15794,"p25_vehicles":14613,"p75_vehicles":16791,"temp_max_c":10.4,"temp_min_c":-4.0,"precip_mm":1.0,"season_tag":"Winter & Ski Season"},{"month":4,"day":24,"doy":114,"date_label":"Apr 24","avg_vehicles":15395,"p25_vehicles":14484,"p75_vehicles":16156,"temp_max_c":10.7,"temp_min_c":-3.3,"precip_mm":1.1,"season_tag":"Winter & Ski Season"},{"month":4,"day":25,"doy":115,"date_label":"Apr 25","avg_vehicles":15068,"p25_vehicles":14252,"p75_vehicles":15805,"temp_max_c":10.8,"temp_min_c":-3.2,"precip_mm":1.4,"season_tag":"Winter & Ski Season"},{"month":4,"day":26,"doy":116,"date_label":"Apr 26","avg_vehicles":14882,"p25_vehicles":14057,"p75_vehicles":15643,"temp_max_c":10.8,"temp_min_c":-3.1,"precip_mm":1.5,"season_tag":"Winter & Ski Season"},{"month":4,"day":27,"doy":117,"date_label":"Apr 27","avg_vehicles":15109,"p25_vehicles":14194,"p75_vehicles":16020,"temp_max_c":11.1,"temp_min_c":-3.0,"precip_mm":1.5,"season_tag":"Winter & Ski Season"},{"month":4,"day":28,"doy":118,"date_label":"Apr 28","avg_vehicles":15666,"p25_vehicles":14634,"p75_vehicles":16667,"temp_max_c":11.8,"temp_min_c":-2.7,"precip_mm":1.2,"season_tag":"Winter & Ski Season"},{"month":4,"day":29,"doy":119,"date_label":"Apr 29","avg_vehicles":15894,"p25_vehicles":14852,"p75_vehicles":16939,"temp_max_c":12.0,"temp_min_c":-2.1,"precip_mm":1.0,"season_tag":"Winter & Ski Season"},{"month":4,"day":30,"doy":120,"date_label":"Apr 30","avg_vehicles":15905,"p25_vehicles":14924,"p75_vehicles":16896,"temp_max_c":12.3,"temp_min_c":-2.0,"precip_mm":1.0,"season_tag":"Winter & Ski Season"},{"month":5,"day":1,"doy":121,"date_label":"May 01","avg_vehicles":15822,"p25_vehicles":14874,"p75_vehicles":16813,"temp_max_c":12.8,"temp_min_c":-2.0,"precip_mm":1.2,"season_tag":"Shoulder & Hiking"},{"month":5,"day":2,"doy":122,"date_label":"May 02","avg_vehicles":15722,"p25_vehicles":14901,"p75_vehicles":16719,"temp_max_c":13.5,"temp_min_c":-1.5,"precip_mm":1.0,"season_tag":"Shoulder & Hiking"},{"month":5,"day":3,"doy":123,"date_label":"May 03","avg_vehicles":15760,"p25_vehicles":14948,"p75_vehicles":16815,"temp_max_c":14.1,"temp_min_c":-1.2,"precip_mm":0.9,"season_tag":"Shoulder & Hiking"},{"month":5,"day":4,"doy":124,"date_label":"May 04","avg_vehicles":16001,"p25_vehicles":15169,"p75_vehicles":17085,"temp_max_c":14.6,"temp_min_c":-0.9,"precip_mm":0.9,"season_tag":"Shoulder & Hiking"},{"month":5,"day":5,"doy":125,"date_label":"May 05","avg_vehicles":16553,"p25_vehicles":15664,"p75_vehicles":17676,"temp_max_c":15.3,"temp_min_c":-0.7,"precip_mm":0.8,"season_tag":"Shoulder & Hiking"},{"month":5,"day":6,"doy":126,"date_label":"May 06","avg_vehicles":17034,"p25_vehicles":16108,"p75_vehicles":18224,"temp_max_c":15.9,"temp_min_c":-0.2,"precip_mm":0.4,"season_tag":"Shoulder & Hiking"},{"month":5,"day":7,"doy":127,"date_label":"May 07","avg_vehicles":17234,"p25_vehicles":16236,"p75_vehicles":18395,"temp_max_c":16.2,"temp_min_c":0.1,"precip_mm":0.7,"season_tag":"Shoulder & Hiking"},{"month":5,"day":8,"doy":128,"date_label":"May 08","avg_vehicles":17099,"p25_vehicles":16187,"p75_vehicles":18113,"temp_max_c":16.4,"temp_min_c":0.4,"precip_mm":0.8,"season_tag":"Shoulder & Hiking"},{"month":5,"day":9,"doy":129,"date_label":"May 09","avg_vehicles":16803,"p25_vehicles":16052,"p75_vehicles":17726,"temp_max_c":16.2,"temp_min_c":0.7,"precip_mm":0.8,"season_tag":"Shoulder & Hiking"},{"month":5,"day":10,"doy":130,"date_label":"May 10","avg_vehicles":16886,"p25_vehicles":16111,"p75_vehicles":17808,"temp_max_c":16.4,"temp_min_c":1.1,"precip_mm":0.8,"season_tag":"Shoulder & Hiking"},{"month":5,"day":11,"doy":131,"date_label":"May 11","avg_vehicles":17167,"p25_vehicles":16322,"p75_vehicles":18135,"temp_max_c":16.0,"temp_min_c":1.6,"precip_mm":1.6,"season_tag":"Shoulder & Hiking"},{"month":5,"day":12,"doy":132,"date_label":"May 12","avg_vehicles":17859,"p25_vehicles":16937,"p75_vehicles":18912,"temp_max_c":15.5,"temp_min_c":1.8,"precip_mm":1.8,"season_tag":"Shoulder & Hiking"},{"month":5,"day":13,"doy":133,"date_label":"May 13","avg_vehicles":18641,"p25_vehicles":17730,"p75_vehicles":19653,"temp_max_c":15.1,"temp_min_c":1.6,"precip_mm":2.0,"season_tag":"Shoulder & Hiking"},{"month":5,"day":14,"doy":134,"date_label":"May 14","avg_vehicles":19177,"p25_vehicles":18122,"p75_vehicles":20346,"temp_max_c":14.8,"temp_min_c":1.6,"precip_mm":2.0,"season_tag":"Shoulder & Hiking"},{"month":5,"day":15,"doy":135,"date_label":"May 15","avg_vehicles":19184,"p25_vehicles":18052,"p75_vehicles":20379,"temp_max_c":14.2,"temp_min_c":1.6,"precip_mm":2.2,"season_tag":"Shoulder & Hiking"},{"month":5,"day":16,"doy":136,"date_label":"May 16","avg_vehicles":18936,"p25_vehicles":17871,"p75_vehicles":20100,"temp_max_c":13.7,"temp_min_c":1.5,"precip_mm":2.2,"season_tag":"Shoulder & Hiking"},{"month":5,"day":17,"doy":137,"date_label":"May 17","avg_vehicles":18812,"p25_vehicles":17770,"p75_vehicles":19912,"temp_max_c":13.2,"temp_min_c":1.3,"precip_mm":2.3,"season_tag":"Shoulder & Hiking"},{"month":5,"day":18,"doy":138,"date_label":"May 18","avg_vehicles":19116,"p25_vehicles":18063,"p75_vehicles":20260,"temp_max_c":13.1,"temp_min_c":1.2,"precip_mm":2.1,"season_tag":"Shoulder & Hiking"},{"month":5,"day":19,"doy":139,"date_label":"May 19","avg_vehicles":19732,"p25_vehicles":18608,"p75_vehicles":20928,"temp_max_c":13.3,"temp_min_c":1.1,"precip_mm":2.0,"season_tag":"Shoulder & Hiking"},{"month":5,"day":20,"doy":140,"date_label":"May 20","avg_vehicles":20265,"p25_vehicles":19051,"p75_vehicles":21504,"temp_max_c":13.7,"temp_min_c":1.1,"precip_mm":2.0,"season_tag":"Shoulder & Hiking"},{"month":5,"day":21,"doy":141,"date_label":"May 21","avg_vehicles":20459,"p25_vehicles":19285,"p75_vehicles":21675,"temp_max_c":14.4,"temp_min_c":1.2,"precip_mm":2.1,"season_tag":"Shoulder & Hiking"},{"month":5,"day":22,"doy":142,"date_label":"May 22","avg_vehicles":20570,"p25_vehicles":19467,"p75_vehicles":21733,"temp_max_c":15.3,"temp_min_c":1.4,"precip_mm":1.4,"season_tag":"Shoulder & Hiking"},{"month":5,"day":23,"doy":143,"date_label":"May 23","avg_vehicles":20375,"p25_vehicles":19341,"p75_vehicles":21425,"temp_max_c":16.6,"temp_min_c":1.7,"precip_mm":1.1,"season_tag":"Shoulder & Hiking"},{"month":5,"day":24,"doy":144,"date_label":"May 24","avg_vehicles":20030,"p25_vehicles":18984,"p75_vehicles":21101,"temp_max_c":17.3,"temp_min_c":2.4,"precip_mm":1.1,"season_tag":"Shoulder & Hiking"},{"month":5,"day":25,"doy":145,"date_label":"May 25","avg_vehicles":19811,"p25_vehicles":18843,"p75_vehicles":20774,"temp_max_c":17.6,"temp_min_c":2.8,"precip_mm":1.2,"season_tag":"Shoulder & Hiking"},{"month":5,"day":26,"doy":146,"date_label":"May 26","avg_vehicles":20088,"p25_vehicles":19052,"p75_vehicles":21131,"temp_max_c":18.0,"temp_min_c":3.2,"precip_mm":1.7,"season_tag":"Shoulder & Hiking"},{"month":5,"day":27,"doy":147,"date_label":"May 27","avg_vehicles":20426,"p25_vehicles":19306,"p75_vehicles":21601,"temp_max_c":17.8,"temp_min_c":3.3,"precip_mm":2.0,"season_tag":"Shoulder & Hiking"},{"month":5,"day":28,"doy":148,"date_label":"May 28","avg_vehicles":20597,"p25_vehicles":19511,"p75_vehicles":21745,"temp_max_c":17.9,"temp_min_c":3.5,"precip_mm":1.9,"season_tag":"Shoulder & Hiking"},{"month":5,"day":29,"doy":149,"date_label":"May 29","avg_vehicles":20530,"p25_vehicles":19581,"p75_vehicles":21551,"temp_max_c":18.0,"temp_min_c":3.8,"precip_mm":1.8,"season_tag":"Shoulder & Hiking"},{"month":5,"day":30,"doy":150,"date_label":"May 30","avg_vehicles":20338,"p25_vehicles":19458,"p75_vehicles":21315,"temp_max_c":17.8,"temp_min_c":4.0,"precip_mm":1.8,"season_tag":"Shoulder & Hiking"},{"month":5,"day":31,"doy":151,"date_label":"May 31","avg_vehicles":20280,"p25_vehicles":19487,"p75_vehicles":21238,"temp_max_c":17.6,"temp_min_c":4.0,"precip_mm":1.8,"season_tag":"Shoulder & Hiking"},{"month":6,"day":1,"doy":152,"date_label":"Jun 01","avg_vehicles":20507,"p25_vehicles":19717,"p75_vehicles":21450,"temp_max_c":17.4,"temp_min_c":3.9,"precip_mm":1.7,"season_tag":"Shoulder & Hiking"},{"month":6,"day":2,"doy":153,"date_label":"Jun 02","avg_vehicles":20848,"p25_vehicles":19941,"p75_vehicles":21886,"temp_max_c":17.0,"temp_min_c":3.9,"precip_mm":1.6,"season_tag":"Shoulder & Hiking"},{"month":6,"day":3,"doy":154,"date_label":"Jun 03","avg_vehicles":21281,"p25_vehicles":20369,"p75_vehicles":22369,"temp_max_c":16.7,"temp_min_c":3.6,"precip_mm":1.6,"season_tag":"Shoulder & Hiking"},{"month":6,"day":4,"doy":155,"date_label":"Jun 04","avg_vehicles":21479,"p25_vehicles":20546,"p75_vehicles":22586,"temp_max_c":16.8,"temp_min_c":3.6,"precip_mm":1.5,"season_tag":"Shoulder & Hiking"},{"month":6,"day":5,"doy":156,"date_label":"Jun 05","avg_vehicles":21648,"p25_vehicles":20802,"p75_vehicles":22630,"temp_max_c":17.1,"temp_min_c":3.8,"precip_mm":1.4,"season_tag":"Shoulder & Hiking"},{"month":6,"day":6,"doy":157,"date_label":"Jun 06","avg_vehicles":21663,"p25_vehicles":20995,"p75_vehicles":22484,"temp_max_c":17.5,"temp_min_c":3.9,"precip_mm":0.9,"season_tag":"Shoulder & Hiking"},{"month":6,"day":7,"doy":158,"date_label":"Jun 07","avg_vehicles":21754,"p25_vehicles":21174,"p75_vehicles":22459,"temp_max_c":17.7,"temp_min_c":4.2,"precip_mm":0.9,"season_tag":"Shoulder & Hiking"},{"month":6,"day":8,"doy":159,"date_label":"Jun 08","avg_vehicles":22184,"p25_vehicles":21559,"p75_vehicles":22880,"temp_max_c":18.2,"temp_min_c":4.2,"precip_mm":1.0,"season_tag":"Shoulder & Hiking"},{"month":6,"day":9,"doy":160,"date_label":"Jun 09","avg_vehicles":22756,"p25_vehicles":22086,"p75_vehicles":23492,"temp_max_c":18.5,"temp_min_c":4.2,"precip_mm":1.0,"season_tag":"Shoulder & Hiking"},{"month":6,"day":10,"doy":161,"date_label":"Jun 10","avg_vehicles":23192,"p25_vehicles":22491,"p75_vehicles":23960,"temp_max_c":18.9,"temp_min_c":4.3,"precip_mm":1.1,"season_tag":"Shoulder & Hiking"},{"month":6,"day":11,"doy":162,"date_label":"Jun 11","avg_vehicles":23369,"p25_vehicles":22683,"p75_vehicles":24114,"temp_max_c":18.9,"temp_min_c":4.4,"precip_mm":1.2,"season_tag":"Shoulder & Hiking"},{"month":6,"day":12,"doy":163,"date_label":"Jun 12","avg_vehicles":23418,"p25_vehicles":22741,"p75_vehicles":24140,"temp_max_c":19.0,"temp_min_c":4.4,"precip_mm":1.4,"season_tag":"Shoulder & Hiking"},{"month":6,"day":13,"doy":164,"date_label":"Jun 13","avg_vehicles":23406,"p25_vehicles":22839,"p75_vehicles":24060,"temp_max_c":18.8,"temp_min_c":4.2,"precip_mm":1.6,"season_tag":"Shoulder & Hiking"},{"month":6,"day":14,"doy":165,"date_label":"Jun 14","avg_vehicles":23500,"p25_vehicles":22909,"p75_vehicles":24143,"temp_max_c":18.6,"temp_min_c":4.2,"precip_mm":1.6,"season_tag":"Shoulder & Hiking"},{"month":6,"day":15,"doy":166,"date_label":"Jun 15","avg_vehicles":23749,"p25_vehicles":23137,"p75_vehicles":24386,"temp_max_c":18.4,"temp_min_c":4.0,"precip_mm":1.9,"season_tag":"Shoulder & Hiking"},{"month":6,"day":16,"doy":167,"date_label":"Jun 16","avg_vehicles":24003,"p25_vehicles":23339,"p75_vehicles":24772,"temp_max_c":17.9,"temp_min_c":3.6,"precip_mm":2.8,"season_tag":"Shoulder & Hiking"},{"month":6,"day":17,"doy":168,"date_label":"Jun 17","avg_vehicles":24400,"p25_vehicles":23628,"p75_vehicles":25225,"temp_max_c":17.8,"temp_min_c":3.2,"precip_mm":2.5,"season_tag":"Shoulder & Hiking"},{"month":6,"day":18,"doy":169,"date_label":"Jun 18","avg_vehicles":24781,"p25_vehicles":23993,"p75_vehicles":25640,"temp_max_c":18.2,"temp_min_c":3.1,"precip_mm":2.2,"season_tag":"Shoulder & Hiking"},{"month":6,"day":19,"doy":170,"date_label":"Jun 19","avg_vehicles":24871,"p25_vehicles":24140,"p75_vehicles":25707,"temp_max_c":18.4,"temp_min_c":3.3,"precip_mm":2.0,"season_tag":"Shoulder & Hiking"},{"month":6,"day":20,"doy":171,"date_label":"Jun 20","avg_vehicles":24811,"p25_vehicles":24133,"p75_vehicles":25602,"temp_max_c":18.4,"temp_min_c":3.5,"precip_mm":2.2,"season_tag":"Shoulder & Hiking"},{"month":6,"day":21,"doy":172,"date_label":"Jun 21","avg_vehicles":24888,"p25_vehicles":24228,"p75_vehicles":25675,"temp_max_c":18.4,"temp_min_c":3.7,"precip_mm":2.2,"season_tag":"Shoulder & Hiking"},{"month":6,"day":22,"doy":173,"date_label":"Jun 22","avg_vehicles":25096,"p25_vehicles":24360,"p75_vehicles":25978,"temp_max_c":18.2,"temp_min_c":4.0,"precip_mm":2.8,"season_tag":"Shoulder & Hiking"},{"month":6,"day":23,"doy":174,"date_label":"Jun 23","avg_vehicles":25373,"p25_vehicles":24469,"p75_vehicles":26449,"temp_max_c":18.0,"temp_min_c":4.4,"precip_mm":3.7,"season_tag":"Shoulder & Hiking"},{"month":6,"day":24,"doy":175,"date_label":"Jun 24","avg_vehicles":26135,"p25_vehicles":25164,"p75_vehicles":27281,"temp_max_c":18.6,"temp_min_c":4.7,"precip_mm":3.8,"season_tag":"Shoulder & Hiking"},{"month":6,"day":25,"doy":176,"date_label":"Jun 25","avg_vehicles":26554,"p25_vehicles":25584,"p75_vehicles":27692,"temp_max_c":18.9,"temp_min_c":5.1,"precip_mm":3.8,"season_tag":"Shoulder & Hiking"},{"month":6,"day":26,"doy":177,"date_label":"Jun 26","avg_vehicles":26678,"p25_vehicles":25738,"p75_vehicles":27753,"temp_max_c":19.3,"temp_min_c":5.5,"precip_mm":3.7,"season_tag":"Shoulder & Hiking"},{"month":6,"day":27,"doy":178,"date_label":"Jun 27","avg_vehicles":27072,"p25_vehicles":26176,"p75_vehicles":28054,"temp_max_c":19.9,"temp_min_c":5.7,"precip_mm":2.8,"season_tag":"Shoulder & Hiking"},{"month":6,"day":28,"doy":179,"date_label":"Jun 28","avg_vehicles":27316,"p25_vehicles":26496,"p75_vehicles":28296,"temp_max_c":20.1,"temp_min_c":6.1,"precip_mm":2.8,"season_tag":"Shoulder & Hiking"},{"month":6,"day":29,"doy":180,"date_label":"Jun 29","avg_vehicles":27613,"p25_vehicles":26794,"p75_vehicles":28572,"temp_max_c":20.2,"temp_min_c":6.3,"precip_mm":2.8,"season_tag":"Shoulder & Hiking"},{"month":6,"day":30,"doy":181,"date_label":"Jun 30","avg_vehicles":27800,"p25_vehicles":27049,"p75_vehicles":28706,"temp_max_c":20.3,"temp_min_c":6.6,"precip_mm":2.9,"season_tag":"Shoulder & Hiking"},{"month":7,"day":1,"doy":182,"date_label":"Jul 01","avg_vehicles":28117,"p25_vehicles":27355,"p75_vehicles":29016,"temp_max_c":20.5,"temp_min_c":6.6,"precip_mm":2.8,"season_tag":"Peak Summer"},{"month":7,"day":2,"doy":183,"date_label":"Jul 02","avg_vehicles":28392,"p25_vehicles":27652,"p75_vehicles":29240,"temp_max_c":21.2,"temp_min_c":6.5,"precip_mm":2.8,"season_tag":"Peak Summer"},{"month":7,"day":3,"doy":184,"date_label":"Jul 03","avg_vehicles":28683,"p25_vehicles":28006,"p75_vehicles":29437,"temp_max_c":22.2,"temp_min_c":6.6,"precip_mm":1.9,"season_tag":"Peak Summer"},{"month":7,"day":4,"doy":185,"date_label":"Jul 04","avg_vehicles":28881,"p25_vehicles":28348,"p75_vehicles":29449,"temp_max_c":23.2,"temp_min_c":6.6,"precip_mm":0.7,"season_tag":"Peak Summer"},{"month":7,"day":5,"doy":186,"date_label":"Jul 05","avg_vehicles":28572,"p25_vehicles":28078,"p75_vehicles":29060,"temp_max_c":23.5,"temp_min_c":6.8,"precip_mm":0.7,"season_tag":"Peak Summer"},{"month":7,"day":6,"doy":187,"date_label":"Jul 06","avg_vehicles":28384,"p25_vehicles":27950,"p75_vehicles":28818,"temp_max_c":24.0,"temp_min_c":6.7,"precip_mm":0.7,"season_tag":"Peak Summer"},{"month":7,"day":7,"doy":188,"date_label":"Jul 07","avg_vehicles":28613,"p25_vehicles":28204,"p75_vehicles":29094,"temp_max_c":24.3,"temp_min_c":6.9,"precip_mm":0.6,"season_tag":"Peak Summer"},{"month":7,"day":8,"doy":189,"date_label":"Jul 08","avg_vehicles":28595,"p25_vehicles":28181,"p75_vehicles":29035,"temp_max_c":24.6,"temp_min_c":7.0,"precip_mm":0.6,"season_tag":"Peak Summer"},{"month":7,"day":9,"doy":190,"date_label":"Jul 09","avg_vehicles":28435,"p25_vehicles":27999,"p75_vehicles":28896,"temp_max_c":24.9,"temp_min_c":6.9,"precip_mm":1.0,"season_tag":"Peak Summer"},{"month":7,"day":10,"doy":191,"date_label":"Jul 10","avg_vehicles":28310,"p25_vehicles":27900,"p75_vehicles":28728,"temp_max_c":25.2,"temp_min_c":7.0,"precip_mm":1.0,"season_tag":"Peak Summer"},{"month":7,"day":11,"doy":192,"date_label":"Jul 11","avg_vehicles":28363,"p25_vehicles":27936,"p75_vehicles":28804,"temp_max_c":25.7,"temp_min_c":6.9,"precip_mm":1.0,"season_tag":"Peak Summer"},{"month":7,"day":12,"doy":193,"date_label":"Jul 12","avg_vehicles":28219,"p25_vehicles":27764,"p75_vehicles":28710,"temp_max_c":25.9,"temp_min_c":7.2,"precip_mm":1.3,"season_tag":"Peak Summer"},{"month":7,"day":13,"doy":194,"date_label":"Jul 13","avg_vehicles":28221,"p25_vehicles":27649,"p75_vehicles":28783,"temp_max_c":25.9,"temp_min_c":7.6,"precip_mm":1.6,"season_tag":"Peak Summer"},{"month":7,"day":14,"doy":195,"date_label":"Jul 14","avg_vehicles":28175,"p25_vehicles":27619,"p75_vehicles":28722,"temp_max_c":25.7,"temp_min_c":7.6,"precip_mm":1.6,"season_tag":"Peak Summer"},{"month":7,"day":15,"doy":196,"date_label":"Jul 15","avg_vehicles":28249,"p25_vehicles":27626,"p75_vehicles":28880,"temp_max_c":25.4,"temp_min_c":7.7,"precip_mm":1.8,"season_tag":"Peak Summer"},{"month":7,"day":16,"doy":197,"date_label":"Jul 16","avg_vehicles":28256,"p25_vehicles":27618,"p75_vehicles":28934,"temp_max_c":25.5,"temp_min_c":7.9,"precip_mm":1.4,"season_tag":"Peak Summer"},{"month":7,"day":17,"doy":198,"date_label":"Jul 17","avg_vehicles":28121,"p25_vehicles":27402,"p75_vehicles":28857,"temp_max_c":25.3,"temp_min_c":8.2,"precip_mm":1.4,"season_tag":"Peak Summer"},{"month":7,"day":18,"doy":199,"date_label":"Jul 18","avg_vehicles":28001,"p25_vehicles":27285,"p75_vehicles":28705,"temp_max_c":25.2,"temp_min_c":7.9,"precip_mm":1.5,"season_tag":"Peak Summer"},{"month":7,"day":19,"doy":200,"date_label":"Jul 19","avg_vehicles":28028,"p25_vehicles":27316,"p75_vehicles":28747,"temp_max_c":25.4,"temp_min_c":8.1,"precip_mm":1.5,"season_tag":"Peak Summer"},{"month":7,"day":20,"doy":201,"date_label":"Jul 20","avg_vehicles":28160,"p25_vehicles":27431,"p75_vehicles":28851,"temp_max_c":25.3,"temp_min_c":8.4,"precip_mm":1.2,"season_tag":"Peak Summer"},{"month":7,"day":21,"doy":202,"date_label":"Jul 21","avg_vehicles":28160,"p25_vehicles":27378,"p75_vehicles":28902,"temp_max_c":24.7,"temp_min_c":8.7,"precip_mm":1.5,"season_tag":"Peak Summer"},{"month":7,"day":22,"doy":203,"date_label":"Jul 22","avg_vehicles":28112,"p25_vehicles":27289,"p75_vehicles":28857,"temp_max_c":24.0,"temp_min_c":8.7,"precip_mm":1.8,"season_tag":"Peak Summer"},{"month":7,"day":23,"doy":204,"date_label":"Jul 23","avg_vehicles":28090,"p25_vehicles":27275,"p75_vehicles":28798,"temp_max_c":23.8,"temp_min_c":8.6,"precip_mm":1.8,"season_tag":"Peak Summer"},{"month":7,"day":24,"doy":205,"date_label":"Jul 24","avg_vehicles":28007,"p25_vehicles":27266,"p75_vehicles":28738,"temp_max_c":23.6,"temp_min_c":8.6,"precip_mm":1.6,"season_tag":"Peak Summer"},{"month":7,"day":25,"doy":206,"date_label":"Jul 25","avg_vehicles":27961,"p25_vehicles":27170,"p75_vehicles":28777,"temp_max_c":23.7,"temp_min_c":8.5,"precip_mm":1.6,"season_tag":"Peak Summer"},{"month":7,"day":26,"doy":207,"date_label":"Jul 26","avg_vehicles":27886,"p25_vehicles":27180,"p75_vehicles":28656,"temp_max_c":24.0,"temp_min_c":8.5,"precip_mm":1.4,"season_tag":"Peak Summer"},{"month":7,"day":27,"doy":208,"date_label":"Jul 27","avg_vehicles":28005,"p25_vehicles":27259,"p75_vehicles":28810,"temp_max_c":24.3,"temp_min_c":8.3,"precip_mm":1.6,"season_tag":"Peak Summer"},{"month":7,"day":28,"doy":209,"date_label":"Jul 28","avg_vehicles":28454,"p25_vehicles":27593,"p75_vehicles":29349,"temp_max_c":24.2,"temp_min_c":8.4,"precip_mm":1.8,"season_tag":"Peak Summer"},{"month":7,"day":29,"doy":210,"date_label":"Jul 29","avg_vehicles":28813,"p25_vehicles":27947,"p75_vehicles":29688,"temp_max_c":24.1,"temp_min_c":8.6,"precip_mm":1.7,"season_tag":"Peak Summer"},{"month":7,"day":30,"doy":211,"date_label":"Jul 30","avg_vehicles":28994,"p25_vehicles":28114,"p75_vehicles":29898,"temp_max_c":23.7,"temp_min_c":8.2,"precip_mm":1.7,"season_tag":"Peak Summer"},{"month":7,"day":31,"doy":212,"date_label":"Jul 31","avg_vehicles":29050,"p25_vehicles":28223,"p75_vehicles":29936,"temp_max_c":24.0,"temp_min_c":8.0,"precip_mm":1.7,"season_tag":"Peak Summer"},{"month":8,"day":1,"doy":213,"date_label":"Aug 01","avg_vehicles":28982,"p25_vehicles":28154,"p75_vehicles":29903,"temp_max_c":24.2,"temp_min_c":7.8,"precip_mm":1.7,"season_tag":"Peak Summer"},{"month":8,"day":2,"doy":214,"date_label":"Aug 02","avg_vehicles":28937,"p25_vehicles":28125,"p75_vehicles":29889,"temp_max_c":24.3,"temp_min_c":7.8,"precip_mm":1.5,"season_tag":"Peak Summer"},{"month":8,"day":3,"doy":215,"date_label":"Aug 03","avg_vehicles":28955,"p25_vehicles":28123,"p75_vehicles":29932,"temp_max_c":24.1,"temp_min_c":7.7,"precip_mm":1.1,"season_tag":"Peak Summer"},{"month":8,"day":4,"doy":216,"date_label":"Aug 04","avg_vehicles":29026,"p25_vehicles":28142,"p75_vehicles":29954,"temp_max_c":24.0,"temp_min_c":7.6,"precip_mm":1.1,"season_tag":"Peak Summer"},{"month":8,"day":5,"doy":217,"date_label":"Aug 05","avg_vehicles":29136,"p25_vehicles":28206,"p75_vehicles":30032,"temp_max_c":23.9,"temp_min_c":7.6,"precip_mm":1.1,"season_tag":"Peak Summer"},{"month":8,"day":6,"doy":218,"date_label":"Aug 06","avg_vehicles":29123,"p25_vehicles":28160,"p75_vehicles":30029,"temp_max_c":23.6,"temp_min_c":7.7,"precip_mm":1.1,"season_tag":"Peak Summer"},{"month":8,"day":7,"doy":219,"date_label":"Aug 07","avg_vehicles":28916,"p25_vehicles":27986,"p75_vehicles":29749,"temp_max_c":22.9,"temp_min_c":7.6,"precip_mm":1.0,"season_tag":"Peak Summer"},{"month":8,"day":8,"doy":220,"date_label":"Aug 08","avg_vehicles":28414,"p25_vehicles":27680,"p75_vehicles":29096,"temp_max_c":22.5,"temp_min_c":7.4,"precip_mm":1.0,"season_tag":"Peak Summer"},{"month":8,"day":9,"doy":221,"date_label":"Aug 09","avg_vehicles":27995,"p25_vehicles":27292,"p75_vehicles":28664,"temp_max_c":22.2,"temp_min_c":7.2,"precip_mm":1.0,"season_tag":"Peak Summer"},{"month":8,"day":10,"doy":222,"date_label":"Aug 10","avg_vehicles":27771,"p25_vehicles":26999,"p75_vehicles":28453,"temp_max_c":22.0,"temp_min_c":7.4,"precip_mm":1.0,"season_tag":"Peak Summer"},{"month":8,"day":11,"doy":223,"date_label":"Aug 11","avg_vehicles":27700,"p25_vehicles":26881,"p75_vehicles":28456,"temp_max_c":21.5,"temp_min_c":7.6,"precip_mm":1.3,"season_tag":"Peak Summer"},{"month":8,"day":12,"doy":224,"date_label":"Aug 12","avg_vehicles":27811,"p25_vehicles":27001,"p75_vehicles":28534,"temp_max_c":21.7,"temp_min_c":7.6,"precip_mm":1.0,"season_tag":"Peak Summer"},{"month":8,"day":13,"doy":225,"date_label":"Aug 13","avg_vehicles":27825,"p25_vehicles":27033,"p75_vehicles":28497,"temp_max_c":21.9,"temp_min_c":7.5,"precip_mm":1.0,"season_tag":"Peak Summer"},{"month":8,"day":14,"doy":226,"date_label":"Aug 14","avg_vehicles":27828,"p25_vehicles":27079,"p75_vehicles":28457,"temp_max_c":22.4,"temp_min_c":7.4,"precip_mm":0.9,"season_tag":"Peak Summer"},{"month":8,"day":15,"doy":227,"date_label":"Aug 15","avg_vehicles":27639,"p25_vehicles":26982,"p75_vehicles":28235,"temp_max_c":22.3,"temp_min_c":7.7,"precip_mm":1.1,"season_tag":"Peak Summer"},{"month":8,"day":16,"doy":228,"date_label":"Aug 16","avg_vehicles":27510,"p25_vehicles":26915,"p75_vehicles":28118,"temp_max_c":22.1,"temp_min_c":7.4,"precip_mm":1.4,"season_tag":"Peak Summer"},{"month":8,"day":17,"doy":229,"date_label":"Aug 17","avg_vehicles":27581,"p25_vehicles":26983,"p75_vehicles":28185,"temp_max_c":22.2,"temp_min_c":7.0,"precip_mm":1.4,"season_tag":"Peak Summer"},{"month":8,"day":18,"doy":230,"date_label":"Aug 18","avg_vehicles":27737,"p25_vehicles":27115,"p75_vehicles":28356,"temp_max_c":22.3,"temp_min_c":6.8,"precip_mm":1.6,"season_tag":"Peak Summer"},{"month":8,"day":19,"doy":231,"date_label":"Aug 19","avg_vehicles":27968,"p25_vehicles":27329,"p75_vehicles":28589,"temp_max_c":22.6,"temp_min_c":6.8,"precip_mm":1.8,"season_tag":"Peak Summer"},{"month":8,"day":20,"doy":232,"date_label":"Aug 20","avg_vehicles":27988,"p25_vehicles":27349,"p75_vehicles":28611,"temp_max_c":23.1,"temp_min_c":6.6,"precip_mm":1.8,"season_tag":"Peak Summer"},{"month":8,"day":21,"doy":233,"date_label":"Aug 21","avg_vehicles":27824,"p25_vehicles":27282,"p75_vehicles":28407,"temp_max_c":23.7,"temp_min_c":6.5,"precip_mm":1.7,"season_tag":"Peak Summer"},{"month":8,"day":22,"doy":234,"date_label":"Aug 22","avg_vehicles":27612,"p25_vehicles":27098,"p75_vehicles":28156,"temp_max_c":24.2,"temp_min_c":6.3,"precip_mm":1.3,"season_tag":"Peak Summer"},{"month":8,"day":23,"doy":235,"date_label":"Aug 23","avg_vehicles":27337,"p25_vehicles":26790,"p75_vehicles":27996,"temp_max_c":23.9,"temp_min_c":6.0,"precip_mm":1.9,"season_tag":"Peak Summer"},{"month":8,"day":24,"doy":236,"date_label":"Aug 24","avg_vehicles":27329,"p25_vehicles":26753,"p75_vehicles":28051,"temp_max_c":23.8,"temp_min_c":5.7,"precip_mm":2.1,"season_tag":"Peak Summer"},{"month":8,"day":25,"doy":237,"date_label":"Aug 25","avg_vehicles":27394,"p25_vehicles":26654,"p75_vehicles":28248,"temp_max_c":23.5,"temp_min_c":5.7,"precip_mm":2.7,"season_tag":"Peak Summer"},{"month":8,"day":26,"doy":238,"date_label":"Aug 26","avg_vehicles":27621,"p25_vehicles":26774,"p75_vehicles":28682,"temp_max_c":23.6,"temp_min_c":5.2,"precip_mm":2.5,"season_tag":"Peak Summer"},{"month":8,"day":27,"doy":239,"date_label":"Aug 27","avg_vehicles":27664,"p25_vehicles":26663,"p75_vehicles":28818,"temp_max_c":24.1,"temp_min_c":5.2,"precip_mm":2.2,"season_tag":"Peak Summer"},{"month":8,"day":28,"doy":240,"date_label":"Aug 28","avg_vehicles":27294,"p25_vehicles":26244,"p75_vehicles":28437,"temp_max_c":24.3,"temp_min_c":5.5,"precip_mm":2.2,"season_tag":"Peak Summer"},{"month":8,"day":29,"doy":241,"date_label":"Aug 29","avg_vehicles":26737,"p25_vehicles":25736,"p75_vehicles":27860,"temp_max_c":24.2,"temp_min_c":5.7,"precip_mm":1.8,"season_tag":"Peak Summer"},{"month":8,"day":30,"doy":242,"date_label":"Aug 30","avg_vehicles":26238,"p25_vehicles":25136,"p75_vehicles":27411,"temp_max_c":23.6,"temp_min_c":5.6,"precip_mm":1.6,"season_tag":"Peak Summer"},{"month":8,"day":31,"doy":243,"date_label":"Aug 31","avg_vehicles":26056,"p25_vehicles":24756,"p75_vehicles":27333,"temp_max_c":23.2,"temp_min_c":5.4,"precip_mm":1.7,"season_tag":"Peak Summer"},{"month":9,"day":1,"doy":244,"date_label":"Sep 01","avg_vehicles":26073,"p25_vehicles":24605,"p75_vehicles":27435,"temp_max_c":22.8,"temp_min_c":5.4,"precip_mm":1.7,"season_tag":"Shoulder & Hiking"},{"month":9,"day":2,"doy":245,"date_label":"Sep 02","avg_vehicles":26009,"p25_vehicles":24547,"p75_vehicles":27341,"temp_max_c":22.6,"temp_min_c":5.3,"precip_mm":1.6,"season_tag":"Shoulder & Hiking"},{"month":9,"day":3,"doy":246,"date_label":"Sep 03","avg_vehicles":25823,"p25_vehicles":24383,"p75_vehicles":27047,"temp_max_c":22.9,"temp_min_c":5.2,"precip_mm":1.0,"season_tag":"Shoulder & Hiking"},{"month":9,"day":4,"doy":247,"date_label":"Sep 04","avg_vehicles":25378,"p25_vehicles":23943,"p75_vehicles":26558,"temp_max_c":22.9,"temp_min_c":5.6,"precip_mm":0.9,"season_tag":"Shoulder & Hiking"},{"month":9,"day":5,"doy":248,"date_label":"Sep 05","avg_vehicles":24829,"p25_vehicles":23521,"p75_vehicles":25935,"temp_max_c":22.5,"temp_min_c":5.5,"precip_mm":0.6,"season_tag":"Shoulder & Hiking"},{"month":9,"day":6,"doy":249,"date_label":"Sep 06","avg_vehicles":24242,"p25_vehicles":22989,"p75_vehicles":25207,"temp_max_c":21.9,"temp_min_c":5.4,"precip_mm":0.8,"season_tag":"Shoulder & Hiking"},{"month":9,"day":7,"doy":250,"date_label":"Sep 07","avg_vehicles":23823,"p25_vehicles":22669,"p75_vehicles":24731,"temp_max_c":20.9,"temp_min_c":5.4,"precip_mm":0.9,"season_tag":"Shoulder & Hiking"},{"month":9,"day":8,"doy":251,"date_label":"Sep 08","avg_vehicles":23855,"p25_vehicles":22751,"p75_vehicles":24756,"temp_max_c":20.2,"temp_min_c":4.9,"precip_mm":1.1,"season_tag":"Shoulder & Hiking"},{"month":9,"day":9,"doy":252,"date_label":"Sep 09","avg_vehicles":24045,"p25_vehicles":22879,"p75_vehicles":25021,"temp_max_c":19.6,"temp_min_c":4.6,"precip_mm":1.7,"season_tag":"Shoulder & Hiking"},{"month":9,"day":10,"doy":253,"date_label":"Sep 10","avg_vehicles":23992,"p25_vehicles":22833,"p75_vehicles":24949,"temp_max_c":19.4,"temp_min_c":4.4,"precip_mm":1.9,"season_tag":"Shoulder & Hiking"},{"month":9,"day":11,"doy":254,"date_label":"Sep 11","avg_vehicles":23631,"p25_vehicles":22571,"p75_vehicles":24615,"temp_max_c":19.5,"temp_min_c":4.2,"precip_mm":1.8,"season_tag":"Shoulder & Hiking"},{"month":9,"day":12,"doy":255,"date_label":"Sep 12","avg_vehicles":23146,"p25_vehicles":22160,"p75_vehicles":24168,"temp_max_c":19.4,"temp_min_c":3.8,"precip_mm":1.8,"season_tag":"Shoulder & Hiking"},{"month":9,"day":13,"doy":256,"date_label":"Sep 13","avg_vehicles":22943,"p25_vehicles":21910,"p75_vehicles":24003,"temp_max_c":19.4,"temp_min_c":3.4,"precip_mm":1.8,"season_tag":"Shoulder & Hiking"},{"month":9,"day":14,"doy":257,"date_label":"Sep 14","avg_vehicles":23033,"p25_vehicles":21908,"p75_vehicles":24171,"temp_max_c":19.3,"temp_min_c":3.2,"precip_mm":1.8,"season_tag":"Shoulder & Hiking"},{"month":9,"day":15,"doy":258,"date_label":"Sep 15","avg_vehicles":23264,"p25_vehicles":22089,"p75_vehicles":24564,"temp_max_c":19.0,"temp_min_c":2.8,"precip_mm":1.8,"season_tag":"Larch Season Peak"},{"month":9,"day":16,"doy":259,"date_label":"Sep 16","avg_vehicles":23466,"p25_vehicles":22347,"p75_vehicles":24698,"temp_max_c":19.2,"temp_min_c":2.7,"precip_mm":1.5,"season_tag":"Larch Season Peak"},{"month":9,"day":17,"doy":260,"date_label":"Sep 17","avg_vehicles":23430,"p25_vehicles":22370,"p75_vehicles":24582,"temp_max_c":19.4,"temp_min_c":2.9,"precip_mm":1.4,"season_tag":"Larch Season Peak"},{"month":9,"day":18,"doy":261,"date_label":"Sep 18","avg_vehicles":23261,"p25_vehicles":22252,"p75_vehicles":24339,"temp_max_c":19.6,"temp_min_c":2.9,"precip_mm":1.2,"season_tag":"Larch Season Peak"},{"month":9,"day":19,"doy":262,"date_label":"Sep 19","avg_vehicles":22996,"p25_vehicles":22011,"p75_vehicles":24067,"temp_max_c":19.8,"temp_min_c":3.1,"precip_mm":1.1,"season_tag":"Larch Season Peak"},{"month":9,"day":20,"doy":263,"date_label":"Sep 20","avg_vehicles":22820,"p25_vehicles":21843,"p75_vehicles":23838,"temp_max_c":20.3,"temp_min_c":3.1,"precip_mm":0.5,"season_tag":"Larch Season Peak"},{"month":9,"day":21,"doy":264,"date_label":"Sep 21","avg_vehicles":22938,"p25_vehicles":21937,"p75_vehicles":24029,"temp_max_c":20.2,"temp_min_c":3.2,"precip_mm":0.3,"season_tag":"Larch Season Peak"},{"month":9,"day":22,"doy":265,"date_label":"Sep 22","avg_vehicles":23367,"p25_vehicles":22354,"p75_vehicles":24385,"temp_max_c":19.7,"temp_min_c":3.5,"precip_mm":0.3,"season_tag":"Larch Season Peak"},{"month":9,"day":23,"doy":266,"date_label":"Sep 23","avg_vehicles":23776,"p25_vehicles":22693,"p75_vehicles":24787,"temp_max_c":19.0,"temp_min_c":3.4,"precip_mm":0.3,"season_tag":"Larch Season Peak"},{"month":9,"day":24,"doy":267,"date_label":"Sep 24","avg_vehicles":23809,"p25_vehicles":22730,"p75_vehicles":24827,"temp_max_c":18.5,"temp_min_c":3.5,"precip_mm":0.4,"season_tag":"Larch Season Peak"},{"month":9,"day":25,"doy":268,"date_label":"Sep 25","avg_vehicles":23606,"p25_vehicles":22670,"p75_vehicles":24490,"temp_max_c":17.6,"temp_min_c":3.5,"precip_mm":0.3,"season_tag":"Larch Season Peak"},{"month":9,"day":26,"doy":269,"date_label":"Sep 26","avg_vehicles":23110,"p25_vehicles":22209,"p75_vehicles":23895,"temp_max_c":16.9,"temp_min_c":3.4,"precip_mm":0.3,"season_tag":"Larch Season Peak"},{"month":9,"day":27,"doy":270,"date_label":"Sep 27","avg_vehicles":22737,"p25_vehicles":21757,"p75_vehicles":23589,"temp_max_c":16.3,"temp_min_c":3.2,"precip_mm":0.4,"season_tag":"Larch Season Peak"},{"month":9,"day":28,"doy":271,"date_label":"Sep 28","avg_vehicles":22684,"p25_vehicles":21606,"p75_vehicles":23641,"temp_max_c":15.9,"temp_min_c":2.8,"precip_mm":0.4,"season_tag":"Larch Season Peak"},{"month":9,"day":29,"doy":272,"date_label":"Sep 29","avg_vehicles":22728,"p25_vehicles":21615,"p75_vehicles":23718,"temp_max_c":15.4,"temp_min_c":2.2,"precip_mm":0.6,"season_tag":"Larch Season Peak"},{"month":9,"day":30,"doy":273,"date_label":"Sep 30","avg_vehicles":22725,"p25_vehicles":21600,"p75_vehicles":23747,"temp_max_c":14.9,"temp_min_c":1.8,"precip_mm":0.6,"season_tag":"Larch Season Peak"},{"month":10,"day":1,"doy":274,"date_label":"Oct 01","avg_vehicles":22400,"p25_vehicles":21329,"p75_vehicles":23416,"temp_max_c":14.2,"temp_min_c":1.5,"precip_mm":0.5,"season_tag":"Larch Season Peak"},{"month":10,"day":2,"doy":275,"date_label":"Oct 02","avg_vehicles":21893,"p25_vehicles":20968,"p75_vehicles":22775,"temp_max_c":14.6,"temp_min_c":1.1,"precip_mm":0.4,"season_tag":"Larch Season Peak"},{"month":10,"day":3,"doy":276,"date_label":"Oct 03","avg_vehicles":21116,"p25_vehicles":20291,"p75_vehicles":21958,"temp_max_c":14.8,"temp_min_c":1.0,"precip_mm":0.4,"season_tag":"Larch Season Peak"},{"month":10,"day":4,"doy":277,"date_label":"Oct 04","avg_vehicles":20397,"p25_vehicles":19707,"p75_vehicles":21159,"temp_max_c":14.8,"temp_min_c":1.0,"precip_mm":0.6,"season_tag":"Larch Season Peak"},{"month":10,"day":5,"doy":278,"date_label":"Oct 05","avg_vehicles":20078,"p25_vehicles":19434,"p75_vehicles":20796,"temp_max_c":14.3,"temp_min_c":0.5,"precip_mm":0.5,"season_tag":"Larch Season Peak"},{"month":10,"day":6,"doy":279,"date_label":"Oct 06","avg_vehicles":19831,"p25_vehicles":19170,"p75_vehicles":20575,"temp_max_c":14.0,"temp_min_c":0.0,"precip_mm":0.9,"season_tag":"Larch Season Peak"},{"month":10,"day":7,"doy":280,"date_label":"Oct 07","avg_vehicles":19823,"p25_vehicles":19155,"p75_vehicles":20545,"temp_max_c":13.7,"temp_min_c":-0.5,"precip_mm":0.9,"season_tag":"Larch Season Peak"},{"month":10,"day":8,"doy":281,"date_label":"Oct 08","avg_vehicles":19728,"p25_vehicles":18939,"p75_vehicles":20487,"temp_max_c":13.5,"temp_min_c":-0.9,"precip_mm":0.8,"season_tag":"Larch Season Peak"},{"month":10,"day":9,"doy":282,"date_label":"Oct 09","avg_vehicles":19370,"p25_vehicles":18579,"p75_vehicles":20072,"temp_max_c":13.4,"temp_min_c":-1.1,"precip_mm":0.8,"season_tag":"Larch Season Peak"},{"month":10,"day":10,"doy":283,"date_label":"Oct 10","avg_vehicles":18869,"p25_vehicles":18137,"p75_vehicles":19516,"temp_max_c":13.3,"temp_min_c":-1.0,"precip_mm":0.6,"season_tag":"Larch Season Peak"},{"month":10,"day":11,"doy":284,"date_label":"Oct 11","avg_vehicles":18463,"p25_vehicles":17720,"p75_vehicles":19101,"temp_max_c":13.4,"temp_min_c":-1.3,"precip_mm":0.8,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":12,"doy":285,"date_label":"Oct 12","avg_vehicles":18339,"p25_vehicles":17543,"p75_vehicles":19009,"temp_max_c":12.9,"temp_min_c":-1.3,"precip_mm":0.8,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":13,"doy":286,"date_label":"Oct 13","avg_vehicles":18328,"p25_vehicles":17488,"p75_vehicles":19037,"temp_max_c":11.9,"temp_min_c":-1.7,"precip_mm":0.8,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":14,"doy":287,"date_label":"Oct 14","avg_vehicles":18265,"p25_vehicles":17360,"p75_vehicles":19027,"temp_max_c":11.3,"temp_min_c":-2.0,"precip_mm":1.0,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":15,"doy":288,"date_label":"Oct 15","avg_vehicles":18029,"p25_vehicles":17117,"p75_vehicles":18754,"temp_max_c":11.0,"temp_min_c":-2.1,"precip_mm":0.9,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":16,"doy":289,"date_label":"Oct 16","avg_vehicles":17505,"p25_vehicles":16590,"p75_vehicles":18293,"temp_max_c":11.0,"temp_min_c":-2.0,"precip_mm":1.3,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":17,"doy":290,"date_label":"Oct 17","avg_vehicles":17028,"p25_vehicles":16113,"p75_vehicles":17828,"temp_max_c":11.3,"temp_min_c":-2.0,"precip_mm":1.1,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":18,"doy":291,"date_label":"Oct 18","avg_vehicles":16606,"p25_vehicles":15740,"p75_vehicles":17371,"temp_max_c":11.2,"temp_min_c":-1.8,"precip_mm":1.1,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":19,"doy":292,"date_label":"Oct 19","avg_vehicles":16305,"p25_vehicles":15591,"p75_vehicles":17028,"temp_max_c":10.9,"temp_min_c":-1.5,"precip_mm":1.2,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":20,"doy":293,"date_label":"Oct 20","avg_vehicles":16150,"p25_vehicles":15455,"p75_vehicles":16882,"temp_max_c":10.1,"temp_min_c":-1.7,"precip_mm":1.2,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":21,"doy":294,"date_label":"Oct 21","avg_vehicles":16068,"p25_vehicles":15291,"p75_vehicles":16902,"temp_max_c":9.6,"temp_min_c":-1.8,"precip_mm":1.2,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":22,"doy":295,"date_label":"Oct 22","avg_vehicles":15688,"p25_vehicles":14906,"p75_vehicles":16513,"temp_max_c":8.7,"temp_min_c":-1.8,"precip_mm":1.3,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":23,"doy":296,"date_label":"Oct 23","avg_vehicles":15156,"p25_vehicles":14458,"p75_vehicles":15933,"temp_max_c":8.2,"temp_min_c":-2.1,"precip_mm":1.3,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":24,"doy":297,"date_label":"Oct 24","avg_vehicles":14554,"p25_vehicles":13909,"p75_vehicles":15287,"temp_max_c":7.9,"temp_min_c":-2.2,"precip_mm":1.4,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":25,"doy":298,"date_label":"Oct 25","avg_vehicles":14161,"p25_vehicles":13587,"p75_vehicles":14816,"temp_max_c":7.5,"temp_min_c":-2.7,"precip_mm":1.2,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":26,"doy":299,"date_label":"Oct 26","avg_vehicles":13857,"p25_vehicles":13301,"p75_vehicles":14511,"temp_max_c":7.0,"temp_min_c":-3.2,"precip_mm":1.2,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":27,"doy":300,"date_label":"Oct 27","avg_vehicles":13792,"p25_vehicles":13278,"p75_vehicles":14351,"temp_max_c":6.5,"temp_min_c":-3.3,"precip_mm":1.2,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":28,"doy":301,"date_label":"Oct 28","avg_vehicles":13744,"p25_vehicles":13166,"p75_vehicles":14331,"temp_max_c":6.0,"temp_min_c":-3.4,"precip_mm":1.1,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":29,"doy":302,"date_label":"Oct 29","avg_vehicles":13499,"p25_vehicles":12856,"p75_vehicles":14103,"temp_max_c":5.6,"temp_min_c":-3.5,"precip_mm":1.0,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":30,"doy":303,"date_label":"Oct 30","avg_vehicles":13113,"p25_vehicles":12507,"p75_vehicles":13680,"temp_max_c":5.4,"temp_min_c":-4.0,"precip_mm":0.9,"season_tag":"Quiet Autumn Shoulder"},{"month":10,"day":31,"doy":304,"date_label":"Oct 31","avg_vehicles":12676,"p25_vehicles":12116,"p75_vehicles":13228,"temp_max_c":5.1,"temp_min_c":-4.1,"precip_mm":0.9,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":1,"doy":305,"date_label":"Nov 01","avg_vehicles":12394,"p25_vehicles":11886,"p75_vehicles":12878,"temp_max_c":5.1,"temp_min_c":-3.9,"precip_mm":0.9,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":2,"doy":306,"date_label":"Nov 02","avg_vehicles":12539,"p25_vehicles":11964,"p75_vehicles":13085,"temp_max_c":5.3,"temp_min_c":-3.9,"precip_mm":0.8,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":3,"doy":307,"date_label":"Nov 03","avg_vehicles":12903,"p25_vehicles":12263,"p75_vehicles":13464,"temp_max_c":5.6,"temp_min_c":-3.6,"precip_mm":0.8,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":4,"doy":308,"date_label":"Nov 04","avg_vehicles":13370,"p25_vehicles":12617,"p75_vehicles":14072,"temp_max_c":5.7,"temp_min_c":-3.2,"precip_mm":0.9,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":5,"doy":309,"date_label":"Nov 05","avg_vehicles":13825,"p25_vehicles":12950,"p75_vehicles":14690,"temp_max_c":6.0,"temp_min_c":-2.7,"precip_mm":1.0,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":6,"doy":310,"date_label":"Nov 06","avg_vehicles":14304,"p25_vehicles":13456,"p75_vehicles":15153,"temp_max_c":6.2,"temp_min_c":-2.1,"precip_mm":1.1,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":7,"doy":311,"date_label":"Nov 07","avg_vehicles":14511,"p25_vehicles":13613,"p75_vehicles":15375,"temp_max_c":6.0,"temp_min_c":-2.0,"precip_mm":0.7,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":8,"doy":312,"date_label":"Nov 08","avg_vehicles":14486,"p25_vehicles":13669,"p75_vehicles":15279,"temp_max_c":5.9,"temp_min_c":-1.8,"precip_mm":0.9,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":9,"doy":313,"date_label":"Nov 09","avg_vehicles":14566,"p25_vehicles":13801,"p75_vehicles":15364,"temp_max_c":6.0,"temp_min_c":-1.7,"precip_mm":0.9,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":10,"doy":314,"date_label":"Nov 10","avg_vehicles":14773,"p25_vehicles":13946,"p75_vehicles":15669,"temp_max_c":5.8,"temp_min_c":-1.6,"precip_mm":1.0,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":11,"doy":315,"date_label":"Nov 11","avg_vehicles":15045,"p25_vehicles":14114,"p75_vehicles":16010,"temp_max_c":5.9,"temp_min_c":-1.8,"precip_mm":0.9,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":12,"doy":316,"date_label":"Nov 12","avg_vehicles":15144,"p25_vehicles":14217,"p75_vehicles":16151,"temp_max_c":5.6,"temp_min_c":-1.9,"precip_mm":0.9,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":13,"doy":317,"date_label":"Nov 13","avg_vehicles":14996,"p25_vehicles":13936,"p75_vehicles":16043,"temp_max_c":5.1,"temp_min_c":-2.4,"precip_mm":1.0,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":14,"doy":318,"date_label":"Nov 14","avg_vehicles":14668,"p25_vehicles":13551,"p75_vehicles":15761,"temp_max_c":4.5,"temp_min_c":-3.1,"precip_mm":0.9,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":15,"doy":319,"date_label":"Nov 15","avg_vehicles":14174,"p25_vehicles":13107,"p75_vehicles":15174,"temp_max_c":4.0,"temp_min_c":-3.9,"precip_mm":0.8,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":16,"doy":320,"date_label":"Nov 16","avg_vehicles":13706,"p25_vehicles":12666,"p75_vehicles":14592,"temp_max_c":3.3,"temp_min_c":-4.4,"precip_mm":0.8,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":17,"doy":321,"date_label":"Nov 17","avg_vehicles":13380,"p25_vehicles":12220,"p75_vehicles":14361,"temp_max_c":2.5,"temp_min_c":-5.0,"precip_mm":0.9,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":18,"doy":322,"date_label":"Nov 18","avg_vehicles":13205,"p25_vehicles":12068,"p75_vehicles":14210,"temp_max_c":1.8,"temp_min_c":-5.6,"precip_mm":1.1,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":19,"doy":323,"date_label":"Nov 19","avg_vehicles":13215,"p25_vehicles":12003,"p75_vehicles":14354,"temp_max_c":1.0,"temp_min_c":-6.8,"precip_mm":1.0,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":20,"doy":324,"date_label":"Nov 20","avg_vehicles":13265,"p25_vehicles":11901,"p75_vehicles":14459,"temp_max_c":0.2,"temp_min_c":-8.1,"precip_mm":1.0,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":21,"doy":325,"date_label":"Nov 21","avg_vehicles":13228,"p25_vehicles":11837,"p75_vehicles":14356,"temp_max_c":-0.4,"temp_min_c":-8.9,"precip_mm":0.9,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":22,"doy":326,"date_label":"Nov 22","avg_vehicles":12984,"p25_vehicles":11690,"p75_vehicles":14033,"temp_max_c":-1.2,"temp_min_c":-9.5,"precip_mm":0.9,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":23,"doy":327,"date_label":"Nov 23","avg_vehicles":12887,"p25_vehicles":11545,"p75_vehicles":13931,"temp_max_c":-2.1,"temp_min_c":-10.7,"precip_mm":0.9,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":24,"doy":328,"date_label":"Nov 24","avg_vehicles":12999,"p25_vehicles":11815,"p75_vehicles":14035,"temp_max_c":-2.7,"temp_min_c":-11.4,"precip_mm":0.8,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":25,"doy":329,"date_label":"Nov 25","avg_vehicles":13178,"p25_vehicles":12000,"p75_vehicles":14269,"temp_max_c":-3.3,"temp_min_c":-12.0,"precip_mm":0.8,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":26,"doy":330,"date_label":"Nov 26","avg_vehicles":13362,"p25_vehicles":12180,"p75_vehicles":14511,"temp_max_c":-3.5,"temp_min_c":-12.4,"precip_mm":0.7,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":27,"doy":331,"date_label":"Nov 27","avg_vehicles":13414,"p25_vehicles":12153,"p75_vehicles":14603,"temp_max_c":-3.7,"temp_min_c":-12.5,"precip_mm":0.6,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":28,"doy":332,"date_label":"Nov 28","avg_vehicles":13283,"p25_vehicles":12034,"p75_vehicles":14415,"temp_max_c":-3.8,"temp_min_c":-12.7,"precip_mm":0.4,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":29,"doy":333,"date_label":"Nov 29","avg_vehicles":13046,"p25_vehicles":11804,"p75_vehicles":14146,"temp_max_c":-3.4,"temp_min_c":-12.2,"precip_mm":0.2,"season_tag":"Quiet Autumn Shoulder"},{"month":11,"day":30,"doy":334,"date_label":"Nov 30","avg_vehicles":12911,"p25_vehicles":11674,"p75_vehicles":13947,"temp_max_c":-2.8,"temp_min_c":-11.4,"precip_mm":0.1,"season_tag":"Quiet Autumn Shoulder"},{"month":12,"day":1,"doy":335,"date_label":"Dec 01","avg_vehicles":12868,"p25_vehicles":11731,"p75_vehicles":13948,"temp_max_c":-2.2,"temp_min_c":-10.4,"precip_mm":0.8,"season_tag":"Winter & Ski Season"},{"month":12,"day":2,"doy":336,"date_label":"Dec 02","avg_vehicles":12909,"p25_vehicles":11747,"p75_vehicles":14108,"temp_max_c":-1.7,"temp_min_c":-9.4,"precip_mm":1.0,"season_tag":"Winter & Ski Season"},{"month":12,"day":3,"doy":337,"date_label":"Dec 03","avg_vehicles":13040,"p25_vehicles":11795,"p75_vehicles":14279,"temp_max_c":-1.2,"temp_min_c":-8.5,"precip_mm":1.2,"season_tag":"Winter & Ski Season"},{"month":12,"day":4,"doy":338,"date_label":"Dec 04","avg_vehicles":12960,"p25_vehicles":11742,"p75_vehicles":14166,"temp_max_c":-0.8,"temp_min_c":-7.9,"precip_mm":1.3,"season_tag":"Winter & Ski Season"},{"month":12,"day":5,"doy":339,"date_label":"Dec 05","avg_vehicles":12662,"p25_vehicles":11518,"p75_vehicles":13742,"temp_max_c":-0.5,"temp_min_c":-7.2,"precip_mm":1.5,"season_tag":"Winter & Ski Season"},{"month":12,"day":6,"doy":340,"date_label":"Dec 06","avg_vehicles":12344,"p25_vehicles":11298,"p75_vehicles":13324,"temp_max_c":-0.1,"temp_min_c":-7.0,"precip_mm":1.6,"season_tag":"Winter & Ski Season"},{"month":12,"day":7,"doy":341,"date_label":"Dec 07","avg_vehicles":12188,"p25_vehicles":11141,"p75_vehicles":13124,"temp_max_c":-0.4,"temp_min_c":-6.8,"precip_mm":1.7,"season_tag":"Winter & Ski Season"},{"month":12,"day":8,"doy":342,"date_label":"Dec 08","avg_vehicles":12256,"p25_vehicles":11284,"p75_vehicles":13223,"temp_max_c":-0.3,"temp_min_c":-7.2,"precip_mm":1.7,"season_tag":"Winter & Ski Season"},{"month":12,"day":9,"doy":343,"date_label":"Dec 09","avg_vehicles":12410,"p25_vehicles":11463,"p75_vehicles":13488,"temp_max_c":-0.1,"temp_min_c":-6.8,"precip_mm":1.9,"season_tag":"Winter & Ski Season"},{"month":12,"day":10,"doy":344,"date_label":"Dec 10","avg_vehicles":12635,"p25_vehicles":11610,"p75_vehicles":13742,"temp_max_c":-0.1,"temp_min_c":-6.8,"precip_mm":2.0,"season_tag":"Winter & Ski Season"},{"month":12,"day":11,"doy":345,"date_label":"Dec 11","avg_vehicles":12719,"p25_vehicles":11724,"p75_vehicles":13774,"temp_max_c":-0.1,"temp_min_c":-6.9,"precip_mm":1.9,"season_tag":"Winter & Ski Season"},{"month":12,"day":12,"doy":346,"date_label":"Dec 12","avg_vehicles":12637,"p25_vehicles":11655,"p75_vehicles":13594,"temp_max_c":-0.5,"temp_min_c":-7.0,"precip_mm":1.7,"season_tag":"Winter & Ski Season"},{"month":12,"day":13,"doy":347,"date_label":"Dec 13","avg_vehicles":12467,"p25_vehicles":11614,"p75_vehicles":13247,"temp_max_c":-0.7,"temp_min_c":-7.3,"precip_mm":1.6,"season_tag":"Winter & Ski Season"},{"month":12,"day":14,"doy":348,"date_label":"Dec 14","avg_vehicles":12469,"p25_vehicles":11729,"p75_vehicles":13188,"temp_max_c":-0.8,"temp_min_c":-7.7,"precip_mm":1.6,"season_tag":"Winter & Ski Season"},{"month":12,"day":15,"doy":349,"date_label":"Dec 15","avg_vehicles":12658,"p25_vehicles":11939,"p75_vehicles":13349,"temp_max_c":-0.5,"temp_min_c":-7.5,"precip_mm":1.5,"season_tag":"Winter & Ski Season"},{"month":12,"day":16,"doy":350,"date_label":"Dec 16","avg_vehicles":13026,"p25_vehicles":12266,"p75_vehicles":13725,"temp_max_c":-0.1,"temp_min_c":-7.2,"precip_mm":1.3,"season_tag":"Winter & Ski Season"},{"month":12,"day":17,"doy":351,"date_label":"Dec 17","avg_vehicles":13466,"p25_vehicles":12687,"p75_vehicles":14146,"temp_max_c":0.2,"temp_min_c":-6.8,"precip_mm":1.3,"season_tag":"Winter & Ski Season"},{"month":12,"day":18,"doy":352,"date_label":"Dec 18","avg_vehicles":13850,"p25_vehicles":13109,"p75_vehicles":14489,"temp_max_c":0.8,"temp_min_c":-6.5,"precip_mm":1.2,"season_tag":"Winter & Ski Season"},{"month":12,"day":19,"doy":353,"date_label":"Dec 19","avg_vehicles":13874,"p25_vehicles":13191,"p75_vehicles":14477,"temp_max_c":0.6,"temp_min_c":-6.5,"precip_mm":1.4,"season_tag":"Winter & Ski Season"},{"month":12,"day":20,"doy":354,"date_label":"Dec 20","avg_vehicles":14109,"p25_vehicles":13434,"p75_vehicles":14616,"temp_max_c":0.3,"temp_min_c":-7.1,"precip_mm":1.3,"season_tag":"Winter & Ski Season"},{"month":12,"day":21,"doy":355,"date_label":"Dec 21","avg_vehicles":14448,"p25_vehicles":13804,"p75_vehicles":14977,"temp_max_c":-0.1,"temp_min_c":-7.7,"precip_mm":1.3,"season_tag":"Winter & Ski Season"},{"month":12,"day":22,"doy":356,"date_label":"Dec 22","avg_vehicles":14946,"p25_vehicles":14221,"p75_vehicles":15586,"temp_max_c":-0.7,"temp_min_c":-8.6,"precip_mm":1.4,"season_tag":"Winter & Ski Season"},{"month":12,"day":23,"doy":357,"date_label":"Dec 23","avg_vehicles":15593,"p25_vehicles":14827,"p75_vehicles":16353,"temp_max_c":-0.9,"temp_min_c":-9.2,"precip_mm":1.0,"season_tag":"Christmas & New Year Peak"},{"month":12,"day":24,"doy":358,"date_label":"Dec 24","avg_vehicles":16287,"p25_vehicles":15437,"p75_vehicles":17170,"temp_max_c":-1.2,"temp_min_c":-9.4,"precip_mm":0.8,"season_tag":"Christmas & New Year Peak"},{"month":12,"day":25,"doy":359,"date_label":"Dec 25","avg_vehicles":16883,"p25_vehicles":16002,"p75_vehicles":17827,"temp_max_c":-1.3,"temp_min_c":-9.4,"precip_mm":0.7,"season_tag":"Christmas & New Year Peak"},{"month":12,"day":26,"doy":360,"date_label":"Dec 26","avg_vehicles":17201,"p25_vehicles":16345,"p75_vehicles":18130,"temp_max_c":-1.7,"temp_min_c":-9.4,"precip_mm":0.7,"season_tag":"Christmas & New Year Peak"},{"month":12,"day":27,"doy":361,"date_label":"Dec 27","avg_vehicles":17322,"p25_vehicles":16516,"p75_vehicles":18234,"temp_max_c":-2.2,"temp_min_c":-10.1,"precip_mm":0.7,"season_tag":"Christmas & New Year Peak"},{"month":12,"day":28,"doy":362,"date_label":"Dec 28","avg_vehicles":17434,"p25_vehicles":16669,"p75_vehicles":18329,"temp_max_c":-2.9,"temp_min_c":-10.5,"precip_mm":0.6,"season_tag":"Christmas & New Year Peak"},{"month":12,"day":29,"doy":363,"date_label":"Dec 29","avg_vehicles":17386,"p25_vehicles":16624,"p75_vehicles":18283,"temp_max_c":-3.2,"temp_min_c":-11.2,"precip_mm":0.6,"season_tag":"Christmas & New Year Peak"},{"month":12,"day":30,"doy":364,"date_label":"Dec 30","avg_vehicles":17500,"p25_vehicles":16750,"p75_vehicles":18380,"temp_max_c":-3.0,"temp_min_c":-10.8,"precip_mm":0.4,"season_tag":"Christmas & New Year Peak"},{"month":12,"day":31,"doy":365,"date_label":"Dec 31","avg_vehicles":17236,"p25_vehicles":16479,"p75_vehicles":18123,"temp_max_c":-2.7,"temp_min_c":-10.4,"precip_mm":0.3,"season_tag":"Christmas & New Year Peak"}],"dow_profile":[{"dow":"Monday","short":"Mon","avg_vehicles":17842,"is_weekend":false},{"dow":"Tuesday","short":"Tue","avg_vehicles":17246,"is_weekend":false},{"dow":"Wednesday","short":"Wed","avg_vehicles":17403,"is_weekend":false},{"dow":"Thursday","short":"Thu","avg_vehicles":17912,"is_weekend":false},{"dow":"Friday","short":"Fri","avg_vehicles":19495,"is_weekend":false},{"dow":"Saturday","short":"Sat","avg_vehicles":21410,"is_weekend":true},{"dow":"Sunday","short":"Sun","avg_vehicles":20132,"is_weekend":true}],"monthly_profile":[{"year":2024,"month":1,"avg_vehicles":12383},{"year":2024,"month":2,"avg_vehicles":13781},{"year":2024,"month":3,"avg_vehicles":14216},{"year":2024,"month":4,"avg_vehicles":13374},{"year":2024,"month":5,"avg_vehicles":17800},{"year":2024,"month":6,"avg_vehicles":23997},{"year":2024,"month":7,"avg_vehicles":27525},{"year":2024,"month":8,"avg_vehicles":27122},{"year":2024,"month":9,"avg_vehicles":23136},{"year":2024,"month":10,"avg_vehicles":16846},{"year":2024,"month":11,"avg_vehicles":13707},{"year":2024,"month":12,"avg_vehicles":15162},{"year":2025,"month":1,"avg_vehicles":13800},{"year":2025,"month":2,"avg_vehicles":14166},{"year":2025,"month":3,"avg_vehicles":15149},{"year":2025,"month":4,"avg_vehicles":15791},{"year":2025,"month":5,"avg_vehicles":19777},{"year":2025,"month":6,"avg_vehicles":24441},{"year":2025,"month":7,"avg_vehicles":27986},{"year":2025,"month":8,"avg_vehicles":29025},{"year":2025,"month":9,"avg_vehicles":23535},{"year":2025,"month":10,"avg_vehicles":17286},{"year":2025,"month":11,"avg_vehicles":14017},{"year":2025,"month":12,"avg_vehicles":13579},{"year":2026,"month":1,"avg_vehicles":14049},{"year":2026,"month":2,"avg_vehicles":14784},{"year":2026,"month":3,"avg_vehicles":14745},{"year":2026,"month":4,"avg_vehicles":14993},{"year":2026,"month":5,"avg_vehicles":18519},{"year":2026,"month":6,"avg_vehicles":23889},{"year":2026,"month":7,"avg_vehicles":29006},{"year":2026,"month":8,"avg_vehicles":28203},{"year":2026,"month":9,"avg_vehicles":24545},{"year":2026,"month":10,"avg_vehicles":17123},{"year":2026,"month":11,"avg_vehicles":13711}],"monthly_typical":[{"month":1,"name":"Jan","avg_vehicles":13411,"temp_max_c":-2.7,"temp_min_c":-11.7,"precip_mm":0.2},{"month":2,"name":"Feb","avg_vehicles":14238,"temp_max_c":-0.4,"temp_min_c":-11.7,"precip_mm":0.8},{"month":3,"name":"Mar","avg_vehicles":14703,"temp_max_c":3.4,"temp_min_c":-7.6,"precip_mm":1.6},{"month":4,"name":"Apr","avg_vehicles":14720,"temp_max_c":9.5,"temp_min_c":-3.4,"precip_mm":1.2},{"month":5,"name":"May","avg_vehicles":18699,"temp_max_c":15.8,"temp_min_c":1.5,"precip_mm":1.5},{"month":6,"name":"Jun","avg_vehicles":24109,"temp_max_c":18.1,"temp_min_c":4.2,"precip_mm":2.2},{"month":7,"name":"Jul","avg_vehicles":28172,"temp_max_c":24.4,"temp_min_c":7.7,"precip_mm":1.2},{"month":8,"name":"Aug","avg_vehicles":28116,"temp_max_c":23.1,"temp_min_c":6.7,"precip_mm":1.7},{"month":9,"name":"Sep","avg_vehicles":23739,"temp_max_c":19.7,"temp_min_c":4.0,"precip_mm":0.9},{"month":10,"name":"Oct","avg_vehicles":17085,"temp_max_c":10.7,"temp_min_c":-1.7,"precip_mm":0.9},{"month":11,"name":"Nov","avg_vehicles":13768,"temp_max_c":2.0,"temp_min_c":-6.2,"precip_mm":0.9},{"month":12,"name":"Dec","avg_vehicles":14270,"temp_max_c":-0.7,"temp_min_c":-7.9,"precip_mm":1.2}]}}</script>
+  <script id="banff-planner-logic">
+    (function (root) {
+      "use strict";
+
+      function filterForecastDays(days, dayFilter) {
+        var upcoming = (days || []).filter(function (d) { return !d.is_bridge_gap; });
+        var list = upcoming.length ? upcoming : (days || []).slice();
+        if (dayFilter === "Weekdays only") {
+          return list.filter(function (d) { return !d.is_weekend; }).sort(byDs);
+        }
+        if (dayFilter === "Weekends only") {
+          return list.filter(function (d) { return !!d.is_weekend; }).sort(byDs);
+        }
+        return list.slice().sort(byDs);
+      }
+
+      function byDs(a, b) {
+        return a.ds < b.ds ? -1 : a.ds > b.ds ? 1 : 0;
+      }
+
+      function getScoreKey(dayFilter, priority) {
+        var isScoped = dayFilter === "Weekdays only" || dayFilter === "Weekends only";
+        if (priority === "quiet") {
+          return isScoped ? "traffic_score_daytype" : "traffic_score_overall";
+        }
+        if (priority === "weather") {
+          return "visit_score_weather";
+        }
+        return isScoped ? "visit_score_scoped_balanced" : "visit_score_balanced";
+      }
+
+      function daysDiff(dsA, dsB) {
+        var a = new Date(dsA + "T00:00:00Z").getTime();
+        var b = new Date(dsB + "T00:00:00Z").getTime();
+        return Math.round((b - a) / 86400000);
+      }
+
+      function computeBestWindow(filteredDays, dayFilter, tripDays, scoreKey) {
+        var list = (filteredDays || []).slice().sort(byDs);
+        if (!list.length) {
+          return { text: "No matching days", start: null, end: null, actual_days: 0, avg_vehicles: null, avg_score: 0 };
+        }
+        var reqK = Math.max(1, Math.min(Number(tripDays) || 3, 4));
+        if (dayFilter === "Weekends only" && reqK > 2) {
+          reqK = 2;
+        }
+        var best = null;
+        for (var k = reqK; k >= 1; k--) {
+          var candidates = [];
+          for (var i = 0; i <= list.length - k; i++) {
+            var chunk = list.slice(i, i + k);
+            if (daysDiff(chunk[0].ds, chunk[chunk.length - 1].ds) === k - 1) {
+              var sumVeh = 0;
+              var sumSc = 0;
+              for (var j = 0; j < chunk.length; j++) {
+                sumVeh += Number(chunk[j].ensemble || 0);
+                sumSc += Number(chunk[j][scoreKey] || 0);
+              }
+              candidates.push({
+                start: chunk[0].ds,
+                end: chunk[chunk.length - 1].ds,
+                startShort: chunk[0].dow_short + ", " + chunk[0].date_short,
+                endShort: chunk[chunk.length - 1].dow_short + ", " + chunk[chunk.length - 1].date_short,
+                actual_days: k,
+                avg_vehicles: Math.round(sumVeh / k),
+                avg_score: Math.round((sumSc / k) * 10) / 10
+              });
+            }
+          }
+          if (candidates.length) {
+            candidates.sort(function (a, b) {
+              if (scoreKey.indexOf("traffic_score") === 0) {
+                if (a.avg_vehicles !== b.avg_vehicles) return a.avg_vehicles - b.avg_vehicles;
+                return b.avg_score - a.avg_score;
+              }
+              if (b.avg_score !== a.avg_score) return b.avg_score - a.avg_score;
+              return a.avg_vehicles - b.avg_vehicles;
+            });
+            best = candidates[0];
+            break;
+          }
+        }
+        if (!best) {
+          var sorted = list.slice().sort(function (a, b) { return a.ensemble - b.ensemble; });
+          var d0 = sorted[0];
+          return {
+            text: d0.dow_short + ", " + d0.date_short,
+            start: d0.ds,
+            end: d0.ds,
+            actual_days: 1,
+            avg_vehicles: Math.round(d0.ensemble),
+            avg_score: Number(d0[scoreKey] || 0)
+          };
+        }
+        return {
+          text: best.actual_days === 1 ? best.startShort : best.startShort + " to " + best.endShort,
+          start: best.start,
+          end: best.end,
+          actual_days: best.actual_days,
+          avg_vehicles: best.avg_vehicles,
+          avg_score: best.avg_score
+        };
+      }
+
+      function computeUnbiasedTrend(recentHistory, filteredDays, dayFilter) {
+        if (!filteredDays.length || !(recentHistory || []).length) {
+          return { label: "Steady trend", detail: "Matching seasonal conditions." };
+        }
+        var pool = recentHistory.filter(function (r) {
+          if (dayFilter === "Weekdays only") return !r.is_weekend;
+          if (dayFilter === "Weekends only") return !!r.is_weekend;
+          return true;
+        });
+        var tail = pool.slice(-30);
+        if (!tail.length) tail = recentHistory.slice(-30);
+        var histMean = tail.reduce(function (s, r) { return s + Number(r.vehicles || 0); }, 0) / tail.length;
+        var nextSubset = filteredDays.slice(0, Math.min(7, filteredDays.length));
+        var nextMean = nextSubset.reduce(function (s, d) { return s + Number(d.ensemble || 0); }, 0) / nextSubset.length;
+        var normMean = nextSubset.reduce(function (s, d) { return s + Number(d.dow_seasonal_norm || 0); }, 0) / nextSubset.length;
+        var normNote = normMean > 0
+          ? " (" + (nextMean >= normMean ? "+" : "") + Math.round(((nextMean - normMean) / normMean) * 100) + "% vs 3-yr norm)"
+          : "";
+        var scopeTxt = dayFilter === "Weekdays only" ? "recent weekdays" : dayFilter === "Weekends only" ? "recent weekends" : "recent 30 days";
+        var delta = histMean > 0 ? ((nextMean - histMean) / histMean) * 100 : 0;
+        if (delta <= -6) {
+          return { label: "Quieter trend", detail: Math.round(Math.abs(delta)) + "% below " + scopeTxt + normNote + "." };
+        }
+        if (delta >= 6) {
+          return { label: "Busier trend", detail: Math.round(delta) + "% above " + scopeTxt + normNote + "." };
+        }
+        return { label: "Steady trend", detail: "Within " + Math.round(Math.abs(delta)) + "% of " + scopeTxt + normNote + "." };
+      }
+
+      function computeRecommendations(payload, dayFilter, priority, tripDays) {
+        var filtered = filterForecastDays(payload.forecast_days, dayFilter);
+        if (!filtered.length) return null;
+        var isScoped = dayFilter === "Weekdays only" || dayFilter === "Weekends only";
+        var scoreKey = getScoreKey(dayFilter, priority);
+        var pctKey = isScoped ? "daytype_percentile" : "overall_percentile";
+
+        var ranked = filtered.slice().sort(function (a, b) {
+          if (Number(b[scoreKey] || 0) !== Number(a[scoreKey] || 0)) {
+            return Number(b[scoreKey] || 0) - Number(a[scoreKey] || 0);
+          }
+          return Number(a.ensemble || 0) - Number(b.ensemble || 0);
+        });
+        var busiest = filtered.slice().sort(function (a, b) {
+          return Number(b.ensemble || 0) - Number(a.ensemble || 0);
+        });
+        var busyCount = filtered.filter(function (d) { return Number(d[pctKey] || 0) > 80; }).length;
+        return {
+          filtered: filtered,
+          isScoped: isScoped,
+          scoreKey: scoreKey,
+          pctKey: pctKey,
+          bestDay: ranked[0],
+          worstDay: busiest[0],
+          bestWindow: computeBestWindow(filtered, dayFilter, tripDays, scoreKey),
+          trend: computeUnbiasedTrend(payload.recent_history, filtered, dayFilter),
+          busyCount: busyCount
+        };
+      }
+
+      root.BanffPlannerLogic = {
+        filterForecastDays: filterForecastDays,
+        computeBestWindow: computeBestWindow,
+        computeUnbiasedTrend: computeUnbiasedTrend,
+        computeRecommendations: computeRecommendations,
+        getScoreKey: getScoreKey
+      };
+    })(typeof globalThis !== "undefined" ? globalThis : this);
+  </script>
+  <script>
+    (function () {
+      "use strict";
+      if (typeof document === "undefined") return;
+
+      var rawEl = document.getElementById("banff-payload-data");
+      var PAYLOAD = rawEl ? JSON.parse(rawEl.textContent) : null;
+      if (!PAYLOAD) return;
+
+      var L = window.BanffPlannerLogic;
+      var upcomingDays = (PAYLOAD.forecast_days || []).filter(function (d) { return !d.is_bridge_gap; });
+      if (!upcomingDays.length) upcomingDays = PAYLOAD.forecast_days || [];
+
+      var state = {
+        view: "planner",
+        dayFilter: "All upcoming days",
+        priority: "balanced",
+        tripDays: 3,
+        selectedDs: upcomingDays[0] ? upcomingDays[0].ds : null,
+        showPi80: true,
+        showPi95: false,
+        showHist: true,
+        showWknd: true
+      };
+
+      // Initialize default selectedDs to initial best day
+      var initRec = L.computeRecommendations(PAYLOAD, state.dayFilter, state.priority, state.tripDays);
+      if (initRec && initRec.bestDay) state.selectedDs = initRec.bestDay.ds;
+
+      // Theme persistence + optional ?theme=dark|light & ?view=planner|annual|science
+      var urlParams = typeof URLSearchParams !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      var qTheme = urlParams ? urlParams.get("theme") : null;
+      var qView = urlParams ? urlParams.get("view") : null;
+      var hashView = (window.location.hash || "").replace("#", "");
+      var savedTheme = null;
+      try { savedTheme = localStorage.getItem("banff_planner_theme"); } catch (e) {}
+      var initTheme = (qTheme === "dark" || qTheme === "light") ? qTheme : savedTheme;
+      if (initTheme === "dark" || initTheme === "light") {
+        document.documentElement.setAttribute("data-theme", initTheme);
+      }
+      updateThemeBtn();
+
+      function updateThemeBtn() {
+        var cur = document.documentElement.getAttribute("data-theme") || "light";
+        document.getElementById("theme-icon").textContent = cur === "dark" ? "☀" : "☾";
+        document.getElementById("theme-label").textContent = cur === "dark" ? "Light" : "Dark";
+      }
+
+      document.getElementById("theme-toggle").addEventListener("click", function () {
+        var cur = document.documentElement.getAttribute("data-theme") || "light";
+        var next = cur === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        try { localStorage.setItem("banff_planner_theme", next); } catch (e) {}
+        updateThemeBtn();
+        drawChartsForActiveView();
+      });
+
+      function cssVar(name) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      }
+
+      function fmtNum(v) {
+        if (v === null || v === undefined || isNaN(v)) return "—";
+        return Math.round(Number(v)).toLocaleString("en-US");
+      }
+
+      function fmtTemp(v) {
+        if (v === null || v === undefined || isNaN(v)) return "—";
+        return Math.round(Number(v)) + "°C";
+      }
+
+      function weatherSvg(iconKey, size) {
+        var s = size || 20;
+        var base = 'width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+        if (iconKey === "sun") {
+          return '<svg ' + base + ' style="color:#D97706"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41"/></svg>';
+        }
+        if (iconKey === "sun-cloud" || iconKey === "partly-cloudy") {
+          return '<svg ' + base + ' style="color:#D97706"><path d="M12 3v2M5.6 5.6l1.4 1.4M3 12h2m11-4a4 4 0 0 0-7.5-1.5"/><path stroke="currentColor" style="color:var(--muted)" d="M7.5 19h9a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 6.2 12.6 3.5 3.5 0 0 0 7.5 19z"/></svg>';
+        }
+        if (iconKey === "snow" || iconKey === "snow-heavy") {
+          return '<svg ' + base + ' style="color:var(--glacier)"><path d="M7 15h10a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 6.5 8.5 3.5 3.5 0 0 0 7 15z"/><path d="M8 18v2m4-2v2m4-2v2"/></svg>';
+        }
+        if (iconKey === "rain" || iconKey === "rain-heavy" || iconKey === "drizzle" || iconKey === "sleet") {
+          return '<svg ' + base + ' style="color:var(--glacier)"><path d="M7 14h10a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 6.5 7.5 3.5 3.5 0 0 0 7 14z"/><path d="M8.5 17.5l-1 3m4.5-3l-1 3m4.5-3l-1 3"/></svg>';
+        }
+        if (iconKey === "storm") {
+          return '<svg ' + base + ' style="color:var(--warn)"><path d="M7 14h10a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 6.5 7.5 3.5 3.5 0 0 0 7 14z"/><path d="M13 14l-2 4h3l-2 4"/></svg>';
+        }
+        return '<svg ' + base + ' style="color:var(--muted)"><path d="M7 17h10a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 6.5 10.5 3.5 3.5 0 0 0 7 17z"/></svg>';
+      }
+
+      // Header Metadata
+      var fresh = PAYLOAD.data_freshness || {};
+      document.getElementById("header-meta").textContent =
+        "Updated " + (fresh.generated_date_mt || PAYLOAD.generated_date_mt) +
+        " · Forecast covers " + upcomingDays.length + " upcoming days (" +
+        upcomingDays[0].date_short + " – " + upcomingDays[upcomingDays.length - 1].date_short + ")" +
+        " · Traffic data through " + (fresh.traffic_last_observed || "latest");
+
+      function setActiveView(viewName) {
+        if (viewName !== "planner" && viewName !== "annual" && viewName !== "science") viewName = "planner";
+        state.view = viewName;
+        document.querySelectorAll(".nav-tab").forEach(function (b) {
+          b.setAttribute("aria-selected", b.getAttribute("data-view") === state.view ? "true" : "false");
+        });
+        document.querySelectorAll(".view-panel").forEach(function (p) {
+          p.hidden = p.id !== "view-" + state.view;
+        });
+        drawChartsForActiveView();
+      }
+
+      // Tab Switching
+      document.querySelectorAll(".nav-tab").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          setActiveView(btn.getAttribute("data-view"));
+        });
+      });
+
+      // Control Bar Handlers
+      document.querySelectorAll("#ctrl-day-filter .seg-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          state.dayFilter = btn.getAttribute("data-filter");
+          document.querySelectorAll("#ctrl-day-filter .seg-btn").forEach(function (b) {
+            b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+          });
+          var r = L.computeRecommendations(PAYLOAD, state.dayFilter, state.priority, state.tripDays);
+          if (r && r.bestDay && r.filtered.every(function (d) { return d.ds !== state.selectedDs; })) {
+            state.selectedDs = r.bestDay.ds;
+          }
+          renderPlanner();
+        });
+      });
+
+      document.querySelectorAll("#ctrl-priority .seg-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          state.priority = btn.getAttribute("data-priority");
+          document.querySelectorAll("#ctrl-priority .seg-btn").forEach(function (b) {
+            b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+          });
+          var r = L.computeRecommendations(PAYLOAD, state.dayFilter, state.priority, state.tripDays);
+          if (r && r.bestDay) state.selectedDs = r.bestDay.ds;
+          renderPlanner();
+        });
+      });
+
+      document.querySelectorAll("#ctrl-trip-days .seg-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          state.tripDays = Number(btn.getAttribute("data-days"));
+          document.querySelectorAll("#ctrl-trip-days .seg-btn").forEach(function (b) {
+            b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+          });
+          renderPlanner();
+        });
+      });
+
+      function bindToggle(id, prop) {
+        var el = document.getElementById(id);
+        el.addEventListener("click", function () {
+          state[prop] = !state[prop];
+          el.setAttribute("aria-pressed", state[prop] ? "true" : "false");
+          drawForecastChart();
+        });
+      }
+      bindToggle("tog-pi80", "showPi80");
+      bindToggle("tog-pi95", "showPi95");
+      bindToggle("tog-hist", "showHist");
+      bindToggle("tog-wknd", "showWknd");
+
+      function renderPlanner() {
+        var rec = L.computeRecommendations(PAYLOAD, state.dayFilter, state.priority, state.tripDays);
+        if (!rec) return;
+
+        var best = rec.bestDay;
+        var worst = rec.worstDay;
+        var win = rec.bestWindow;
+        var bestSignal = rec.isScoped ? best.signal_daytype : best.signal_overall;
+        var bestTone = rec.isScoped ? best.tone_daytype : best.tone_overall;
+        var worstSignal = rec.isScoped ? worst.signal_daytype : worst.signal_overall;
+        var worstTone = rec.isScoped ? worst.tone_daytype : worst.tone_overall;
+        var bestScore = Math.round(Number(best[rec.scoreKey] || 0));
+
+        var bestDrivers = (best.driver_attributions && best.driver_attributions.drivers) ? best.driver_attributions.drivers : [];
+        var calmDriver = bestDrivers.filter(function (dr) { return Number(dr.impact_pct) < 0; })[0];
+        var bestDriverTxt = calmDriver
+          ? calmDriver.factor + " (" + calmDriver.impact_pct.toFixed(1) + "%)"
+          : (bestDrivers[0] ? bestDrivers[0].factor : "Calm midweek traffic flow & comfortable conditions");
+
+        var worstTip = worst.is_weekend
+          ? "Park at Banff Train Station &amp; ride Roam Transit before 09:00 AM."
+          : "Plan hikes before 09:30 AM or explore Bow Valley Parkway / Lake Minnewanka early.";
+
+        document.getElementById("hero-grid").innerHTML =
+          '<article class="card hero-card">' +
+            '<div>' +
+              '<div class="eyebrow"><span>Recommended Day</span><span class="score-chip tabular">Score ' + bestScore + '/100</span></div>' +
+              '<h2 class="hero-date">' + best.dow_short + ", " + best.date_short + '</h2>' +
+              '<span class="signal-pill tone-' + bestTone + '">' + bestSignal + '</span>' +
+              '<div class="hero-weather-row">' + weatherSvg(best.weather_icon, 20) +
+                '<span class="tabular">' + fmtTemp(best.temp_max_c) + ' / ' + fmtTemp(best.temp_min_c) + ' · ' + best.weather_label + '</span></div>' +
+              '<p class="hero-sub"><strong class="tabular">' + fmtNum(best.ensemble) + ' vehicles/day</strong> (80% CI: ' +
+                fmtNum(best.pi80_low) + '–' + fmtNum(best.pi80_high) + '). Primary driver: ' + bestDriverTxt + '.</p>' +
+            '</div>' +
+            '<div class="hero-footer">' +
+              '<span class="tabular" style="color:var(--muted);">' + (best.vs_dow_norm_pct >= 0 ? "+" : "") + best.vs_dow_norm_pct + '% vs typical ' + best.dow_short + '</span>' +
+              '<button class="text-link-btn" type="button" data-select-ds="' + best.ds + '">Inspect breakdown →</button>' +
+            '</div>' +
+          '</article>' +
+
+          '<article class="card hero-card">' +
+            '<div>' +
+              '<div class="eyebrow"><span>Busiest Day to Avoid</span>' +
+                (worst.event_label ? '<span class="signal-pill tone-warning">' + worst.event_label + '</span>' : '<span class="tabular" style="color:var(--muted);">Peak load</span>') +
+              '</div>' +
+              '<h2 class="hero-date">' + worst.dow_short + ", " + worst.date_short + '</h2>' +
+              '<span class="signal-pill tone-' + worstTone + '">' + worstSignal + '</span>' +
+              '<div class="hero-weather-row">' + weatherSvg(worst.weather_icon, 20) +
+                '<span class="tabular">' + fmtTemp(worst.temp_max_c) + ' / ' + fmtTemp(worst.temp_min_c) + ' · ' + worst.weather_label + '</span></div>' +
+              '<p class="hero-sub"><strong class="tabular">' + fmtNum(worst.ensemble) + ' vehicles/day</strong> (' +
+                (worst.vs_dow_norm_pct >= 0 ? "+" : "") + worst.vs_dow_norm_pct + '% vs typical ' + worst.dow_short + '). ' + worstTip + '</p>' +
+            '</div>' +
+            '<div class="hero-footer">' +
+              '<span class="tabular" style="color:var(--muted);">West ' + fmtNum(worst.west_entrance) + ' · East ' + fmtNum(worst.east_entrance) + '</span>' +
+              '<button class="text-link-btn" type="button" data-select-ds="' + worst.ds + '">Inspect peak →</button>' +
+            '</div>' +
+          '</article>' +
+
+          '<article class="card hero-card">' +
+            '<div>' +
+              '<div class="eyebrow"><span>Best ' + win.actual_days + '-Day Contiguous Stay</span><span class="score-chip tabular">Avg ' + fmtNum(win.avg_vehicles) + '/day</span></div>' +
+              '<h2 class="hero-date" style="font-size:1.38rem;">' + win.text + '</h2>' +
+              '<p class="hero-sub" style="margin-top:0.45rem;">' + rec.trend.label + ': ' + rec.trend.detail + '</p>' +
+              '<p class="hero-sub">' + (PAYLOAD.insights && PAYLOAD.insights.conformal_detail ? PAYLOAD.insights.conformal_detail : "") + '</p>' +
+            '</div>' +
+            '<div class="hero-footer">' +
+              '<span>' + rec.busyCount + ' heavy-crowd days in scope</span>' +
+              '<button class="text-link-btn" type="button" data-select-ds="' + (win.start || best.ds) + '">Start of window →</button>' +
+            '</div>' +
+          '</article>';
+
+        document.querySelectorAll("[data-select-ds]").forEach(function (el) {
+          el.addEventListener("click", function () {
+            state.selectedDs = el.getAttribute("data-select-ds");
+            renderStrip();
+            renderInspector();
+            drawForecastChart();
+          });
+        });
+
+        var scopeWord = rec.isScoped ? state.dayFilter.toLowerCase() : "all upcoming days";
+        var bench = PAYLOAD.cv_benchmark || {};
+        var ensRow = (bench.summary_metrics || []).filter(function (m) { return m.model === "Ensemble_Weighted"; })[0];
+        document.getElementById("context-strip").innerHTML =
+          '<div class="stat-mini"><div class="stat-mini-label">Multi-Day Window</div><div class="stat-mini-value tabular">' + win.text + '</div><div class="stat-mini-note">Strictly contiguous ' + win.actual_days + '-day calendar span</div></div>' +
+          '<div class="stat-mini"><div class="stat-mini-label">Day-Type Trend</div><div class="stat-mini-value">' + rec.trend.label + '</div><div class="stat-mini-note">' + rec.trend.detail + '</div></div>' +
+          '<div class="stat-mini"><div class="stat-mini-label">Backtest Precision</div><div class="stat-mini-value tabular">' + (ensRow ? ensRow.MAPE.toFixed(2) + "% MAPE" : "Calibrated") + '</div><div class="stat-mini-note">' + (bench.n_oof_days || 192) + ' unseen CV days · Cov80 ' + (bench.empirical_cov80_pct || 80) + '%</div></div>' +
+          '<div class="stat-mini"><div class="stat-mini-label">Filtered Crowds</div><div class="stat-mini-value tabular">' + rec.busyCount + ' of ' + rec.filtered.length + ' days busy</div><div class="stat-mini-note">Evaluated fairly across ' + scopeWord + '</div></div>';
+
+        renderStrip();
+        renderInspector();
+        drawForecastChart();
+      }
+
+      function renderStrip() {
+        var rec = L.computeRecommendations(PAYLOAD, state.dayFilter, state.priority, state.tripDays);
+        var matchSet = {};
+        rec.filtered.forEach(function (d) { matchSet[d.ds] = true; });
+        var html = upcomingDays.map(function (d) {
+          var isMatch = !!matchSet[d.ds];
+          var isSel = d.ds === state.selectedDs;
+          var tone = rec.isScoped ? d.tone_daytype : d.tone_overall;
+          var sc = Math.round(Number(d[rec.scoreKey] || 0));
+          var precipNote = d.snowfall_cm >= 1.0
+            ? d.snowfall_cm.toFixed(1) + "cm"
+            : (d.precip_prob_pct !== null && d.precip_prob_pct >= 25 ? d.precip_prob_pct + "%" : "");
+          return (
+            '<button type="button" class="day-tile' + (isMatch ? "" : " is-dimmed") + '" aria-pressed="' + (isSel ? "true" : "false") + '" data-ds="' + d.ds + '">' +
+              '<div class="tile-top">' +
+                '<div><div class="tile-date">' + d.date_short + '</div><div class="tile-dow">' + d.dow_short + '</div></div>' +
+                '<span class="tile-dot dot-' + tone + '" title="' + (rec.isScoped ? d.signal_daytype : d.signal_overall) + '"></span>' +
+              '</div>' +
+              '<div class="tile-wx">' + weatherSvg(d.weather_icon, 18) +
+                '<span class="tabular">' + fmtTemp(d.temp_max_c) + '</span>' +
+                (precipNote ? '<span class="tabular" style="color:var(--glacier);font-size:0.73rem;margin-left:auto;">' + precipNote + '</span>' : '') +
+              '</div>' +
+              '<div class="tile-vol-row">' +
+                '<span class="tile-vol tabular">' + (d.ensemble / 1000).toFixed(1) + 'k</span>' +
+                '<span class="tile-score tabular">' + sc + '/100</span>' +
+              '</div>' +
+              (d.event_label ? '<div class="tile-event" title="' + d.event_label + '">' + d.event_label + '</div>' : '') +
+            '</button>'
+          );
+        }).join("");
+        var stripEl = document.getElementById("outlook-strip");
+        stripEl.innerHTML = html;
+        stripEl.querySelectorAll(".day-tile").forEach(function (tile) {
+          tile.addEventListener("click", function () {
+            state.selectedDs = tile.getAttribute("data-ds");
+            renderStrip();
+            renderInspector();
+            drawForecastChart();
+          });
+        });
+      }
+
+      function renderInspector() {
+        var d = upcomingDays.filter(function (x) { return x.ds === state.selectedDs; })[0] || upcomingDays[0];
+        if (!d) return;
+        var rec = L.computeRecommendations(PAYLOAD, state.dayFilter, state.priority, state.tripDays);
+        var sc = Math.round(Number(d[rec.scoreKey] || 0));
+        var toneColor = d.tone_daytype === "best" ? "var(--best)" : d.tone_daytype === "good" ? "var(--good)" : d.tone_daytype === "warning" ? "var(--warn)" : "var(--bad)";
+        var overallColor = d.tone_overall === "best" ? "var(--best)" : d.tone_overall === "good" ? "var(--good)" : d.tone_overall === "warning" ? "var(--warn)" : "var(--bad)";
+
+        var drivers = (d.driver_attributions && d.driver_attributions.drivers && d.driver_attributions.drivers.length)
+          ? d.driver_attributions.drivers
+          : [{ factor: "Baseline seasonal & weekly rhythm", impact_pct: 0.0, category: "calendar" }];
+
+        var driversHtml = drivers.map(function (dr) {
+          var cls = dr.impact_pct >= 0 ? "impact-up" : "impact-down";
+          var sign = dr.impact_pct >= 0 ? "+" : "";
+          return '<div class="driver-row"><span>' + dr.factor + '</span><span class="driver-impact tabular ' + cls + '">' + sign + dr.impact_pct.toFixed(1) + '%</span></div>';
+        }).join("");
+
+        var wShare = Number(d.west_share_pct || 54);
+        var eShare = Math.round((100 - wShare) * 10) / 10;
+        var tip = "";
+        if (d.snowfall_cm >= 2 || (d.temp_max_c !== null && d.temp_max_c <= -10)) {
+          tip = "Winter alpine conditions (" + fmtTemp(d.temp_max_c) + (d.snowfall_cm > 0 ? ", " + d.snowfall_cm.toFixed(1) + " cm snow" : "") + "). Winter tires required on Hwy 93/Icefields Pkwy; layer for sub-zero valley winds.";
+        } else if (d.ensemble >= 19000) {
+          tip = "High park volume expected. Arrive before 08:45 AM, park at Banff Train Station, and use Roam Transit for Lake Louise / Sulphur Mountain.";
+        } else if (d.daytype_percentile <= 35) {
+          tip = "Smooth traffic flow window relative to typical " + d.dow + "s. Ideal for Banff Ave parking, Gondola arrival, or Bow Valley Parkway drives.";
+        } else {
+          tip = "Moderate visitor volume. Peak corridor congestion typically clusters between 10:30 AM and 3:30 PM on Banff Ave &amp; Bow River Bridge.";
+        }
+
+        document.getElementById("day-inspector").innerHTML =
+          '<div class="inspector-header">' +
+            '<div>' +
+              '<div class="eyebrow" style="margin-bottom:0.2rem;">Selected Day Deep Dive</div>' +
+              '<h3 class="inspector-title">' + d.dow + ', ' + d.date_short + '</h3>' +
+              '<span class="signal-pill tone-' + (rec.isScoped ? d.tone_daytype : d.tone_overall) + '">' +
+                (rec.isScoped ? d.signal_daytype : d.signal_overall) + '</span>' +
+              (d.event_label ? ' <span class="signal-pill tone-warning" style="margin-left:0.25rem;">' + d.event_label + '</span>' : '') +
+            '</div>' +
+            '<span class="score-chip tabular">Visit ' + sc + '/100</span>' +
+          '</div>' +
+
+          '<div class="inspector-metric-row">' +
+            '<div class="metric-box">' +
+              '<div class="metric-box-label">Predicted Traffic</div>' +
+              '<div class="metric-box-val tabular">' + fmtNum(d.ensemble) + ' <span style="font-size:0.78rem;font-weight:600;color:var(--muted);">veh</span></div>' +
+              '<div class="metric-box-sub tabular">80% CI: ' + fmtNum(d.pi80_low) + '–' + fmtNum(d.pi80_high) + '</div>' +
+            '</div>' +
+            '<div class="metric-box">' +
+              '<div class="metric-box-label">Banff Weather</div>' +
+              '<div class="metric-box-val tabular" style="display:flex;align-items:center;gap:0.35rem;">' + weatherSvg(d.weather_icon, 19) + fmtTemp(d.temp_max_c) + ' <span style="font-size:0.82rem;color:var(--muted);font-weight:500;">/ ' + fmtTemp(d.temp_min_c) + '</span></div>' +
+              '<div class="metric-box-sub">' + d.weather_label + (d.precip_mm > 0.1 ? ' · ' + d.precip_mm.toFixed(1) + 'mm' : '') + ' · Comfort ' + Math.round(d.weather_score) + '/100</div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="sub-heading">Fair Crowd Benchmarks</div>' +
+          '<div class="pct-bar-wrap">' +
+            '<div class="pct-bar-labels"><span>vs Same Day-of-Week (' + d.dow + 's, 3-yr norm ' + fmtNum(d.dow_seasonal_norm) + ')</span>' +
+              '<strong class="tabular">' + Math.round(d.daytype_percentile) + 'th pct (' + (d.vs_dow_norm_pct >= 0 ? "+" : "") + d.vs_dow_norm_pct + '%)</strong></div>' +
+            '<div class="pct-track"><div class="pct-fill" style="width:' + Math.min(100, Math.max(4, d.daytype_percentile)) + '%;background:' + toneColor + ';"></div></div>' +
+          '</div>' +
+          '<div class="pct-bar-wrap">' +
+            '<div class="pct-bar-labels"><span>vs All Days in Same Season (±10d)</span><strong class="tabular">' + Math.round(d.overall_percentile) + 'th pct</strong></div>' +
+            '<div class="pct-track"><div class="pct-fill" style="width:' + Math.min(100, Math.max(4, d.overall_percentile)) + '%;background:' + overallColor + ';"></div></div>' +
+          '</div>' +
+
+          '<div class="sub-heading">Why This Forecast?</div>' +
+          '<div class="driver-list">' + driversHtml + '</div>' +
+
+          '<div class="sub-heading">Expected Entrance &amp; Corridor Load</div>' +
+          '<div class="entrance-bar">' +
+            '<div class="entrance-west" style="width:' + wShare + '%;"></div>' +
+            '<div class="entrance-east" style="width:' + eShare + '%;"></div>' +
+          '</div>' +
+          '<div class="entrance-labels tabular">' +
+            '<span><strong style="color:var(--glacier);">West (Norquay / Bow Vly)</strong> ' + wShare.toFixed(0) + '% · ' + fmtNum(d.west_entrance) + '</span>' +
+            '<span><strong style="color:var(--accent);">East (Banff Ave / Hwy 1)</strong> ' + eShare.toFixed(0) + '% · ' + fmtNum(d.east_entrance) + '</span>' +
+          '</div>' +
+          '<div style="font-size:0.78rem;color:var(--muted);margin-top:0.25rem;" class="tabular">Mountain Ave / Sulphur Mountain Gondola corridor: ~' + fmtNum(d.mountain_ave) + ' vehicles/day</div>' +
+
+          '<div class="tip-box"><strong>Planner Tip:</strong> ' + tip + '</div>';
+      }
+
+      // HiDPI Forecast Canvas Chart
+      var chartPointsMeta = [];
+      function drawForecastChart() {
+        var canvas = document.getElementById("forecast-canvas");
+        if (!canvas || canvas.offsetParent === null) return;
+        var rect = canvas.parentElement.getBoundingClientRect();
+        var dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.max(300, Math.floor(rect.width * dpr));
+        canvas.height = Math.max(220, Math.floor(rect.height * dpr));
+        var ctx = canvas.getContext("2d");
+        ctx.scale(dpr, dpr);
+
+        var W = rect.width;
+        var H = rect.height;
+        var pad = { top: 24, right: 26, bottom: 38, left: 56 };
+        var plotW = W - pad.left - pad.right;
+        var plotH = H - pad.top - pad.bottom;
+
+        var mShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        function fmtShortDs(ds) {
+          var pts = String(ds || "").split("-");
+          if (pts.length !== 3) return ds;
+          return (mShort[Number(pts[1]) - 1] || pts[1]) + " " + Number(pts[2]);
+        }
+
+        var histTail = state.showHist ? (PAYLOAD.recent_history || []).slice(-35) : [];
+        var fcList = (PAYLOAD.forecast_days || []).slice().sort(function (a, b) { return a.ds < b.ds ? -1 : 1; });
+        var series = [];
+        histTail.forEach(function (h) {
+          series.push({ ds: h.ds, label: fmtShortDs(h.ds), isHist: true, isWeekend: !!h.is_weekend, val: Number(h.vehicles), raw: h });
+        });
+        fcList.forEach(function (f) {
+          series.push({
+            ds: f.ds,
+            label: f.date_short,
+            isHist: false,
+            isWeekend: !!f.is_weekend,
+            val: Number(f.ensemble),
+            pi80L: Number(f.pi80_low),
+            pi80H: Number(f.pi80_high),
+            pi95L: Number(f.pi95_low),
+            pi95H: Number(f.pi95_high),
+            raw: f
+          });
+        });
+
+        if (!series.length) return;
+        var yMin = Infinity, yMax = -Infinity;
+        series.forEach(function (p) {
+          var lo = (!p.isHist && state.showPi95) ? p.pi95L : (!p.isHist && state.showPi80) ? p.pi80L : p.val;
+          var hi = (!p.isHist && state.showPi95) ? p.pi95H : (!p.isHist && state.showPi80) ? p.pi80H : p.val;
+          if (lo < yMin) yMin = lo;
+          if (hi > yMax) yMax = hi;
+        });
+        var ySpan = Math.max(1000, yMax - yMin);
+        yMin = Math.max(0, Math.floor((yMin - ySpan * 0.12) / 1000) * 1000);
+        yMax = Math.ceil((yMax + ySpan * 0.12) / 1000) * 1000;
+
+        function xOf(i) { return pad.left + (series.length === 1 ? plotW / 2 : (i / (series.length - 1)) * plotW); }
+        function yOf(v) { return pad.top + plotH - ((v - yMin) / Math.max(1, yMax - yMin)) * plotH; }
+
+        ctx.clearRect(0, 0, W, H);
+        var borderCol = cssVar("--border");
+        var mutedCol = cssVar("--muted");
+        var inkCol = cssVar("--ink");
+        var glacierCol = cssVar("--glacier");
+        var histCol = cssVar("--history");
+        var bestCol = cssVar("--best");
+        var badCol = cssVar("--bad");
+
+        // Horizontal gridlines
+        ctx.font = "600 11px " + cssVar("--font-sans");
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        for (var g = 0; g <= 4; g++) {
+          var gv = yMin + (g / 4) * (yMax - yMin);
+          var gy = yOf(gv);
+          ctx.strokeStyle = borderCol;
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath(); ctx.moveTo(pad.left, gy); ctx.lineTo(W - pad.right, gy); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = mutedCol;
+          ctx.fillText((gv / 1000).toFixed(1) + "k", pad.left - 8, gy);
+        }
+
+        // Weekend shading
+        var stepW = series.length > 1 ? plotW / (series.length - 1) : plotW;
+        if (state.showWknd) {
+          ctx.fillStyle = cssVar("--weekend-band");
+          series.forEach(function (p, i) {
+            if (p.isWeekend) {
+              var rx = Math.max(pad.left, xOf(i) - stepW * 0.48);
+              var rw = Math.min(W - pad.right - rx, stepW * 0.96);
+              ctx.fillRect(rx, pad.top, rw, plotH);
+            }
+          });
+        }
+
+        // Forecast transition vertical divider
+        var firstFcIdx = -1;
+        for (var k = 0; k < series.length; k++) {
+          if (!series[k].isHist) { firstFcIdx = k; break; }
+        }
+        if (firstFcIdx > 0) {
+          var divX = (xOf(firstFcIdx - 1) + xOf(firstFcIdx)) / 2;
+          ctx.strokeStyle = cssVar("--border-strong");
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath(); ctx.moveTo(divX, pad.top); ctx.lineTo(divX, pad.top + plotH); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = mutedCol;
+          ctx.textAlign = "left";
+          ctx.fillText("Forecast →", divX + 6, pad.top + 8);
+        }
+
+        // 95% and 80% Conformal bands
+        var fcIndices = [];
+        series.forEach(function (p, i) { if (!p.isHist) fcIndices.push(i); });
+
+        function drawBand(lowKey, highKey, fillStyle) {
+          if (fcIndices.length < 2) return;
+          ctx.fillStyle = fillStyle;
+          ctx.beginPath();
+          fcIndices.forEach(function (idx, pos) {
+            var px = xOf(idx), py = yOf(series[idx][highKey]);
+            if (pos === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          });
+          for (var r = fcIndices.length - 1; r >= 0; r--) {
+            var idx2 = fcIndices[r];
+            ctx.lineTo(xOf(idx2), yOf(series[idx2][lowKey]));
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+        if (state.showPi95) drawBand("pi95L", "pi95H", cssVar("--glacier-softer"));
+        if (state.showPi80) drawBand("pi80L", "pi80H", cssVar("--glacier-soft"));
+
+        // History line
+        if (histTail.length > 1) {
+          ctx.strokeStyle = histCol;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          for (var hi = 0; hi < firstFcIdx; hi++) {
+            var hx = xOf(hi), hy = yOf(series[hi].val);
+            if (hi === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
+          }
+          ctx.stroke();
+        }
+
+        // Bridge dashed segment from last observed to first forecast
+        if (firstFcIdx > 0) {
+          ctx.strokeStyle = glacierCol;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(xOf(firstFcIdx - 1), yOf(series[firstFcIdx - 1].val));
+          ctx.lineTo(xOf(firstFcIdx), yOf(series[firstFcIdx].val));
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // Forecast line
+        if (fcIndices.length > 0) {
+          ctx.strokeStyle = glacierCol;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          fcIndices.forEach(function (idx, pos) {
+            var fx = xOf(idx), fy = yOf(series[idx].val);
+            if (pos === 0) ctx.moveTo(fx, fy); else ctx.lineTo(fx, fy);
+          });
+          ctx.stroke();
+        }
+
+        // Highlight best, worst & selected
+        var rec = L.computeRecommendations(PAYLOAD, state.dayFilter, state.priority, state.tripDays);
+        var bestDs = rec && rec.bestDay ? rec.bestDay.ds : null;
+        var worstDs = rec && rec.worstDay ? rec.worstDay.ds : null;
+
+        chartPointsMeta = [];
+        series.forEach(function (p, i) {
+          var px = xOf(i), py = yOf(p.val);
+          chartPointsMeta.push({ x: px, y: py, item: p });
+          if (!p.isHist) {
+            var isSel = p.ds === state.selectedDs;
+            var isBest = p.ds === bestDs;
+            var isWorst = p.ds === worstDs;
+            if (isSel) {
+              ctx.strokeStyle = cssVar("--accent");
+              ctx.lineWidth = 1.5;
+              ctx.setLineDash([2, 2]);
+              ctx.beginPath(); ctx.moveTo(px, pad.top); ctx.lineTo(px, pad.top + plotH); ctx.stroke();
+              ctx.setLineDash([]);
+            }
+            ctx.beginPath();
+            ctx.arc(px, py, isSel ? 6.5 : (isBest || isWorst ? 5.5 : 3.8), 0, Math.PI * 2);
+            ctx.fillStyle = isBest ? bestCol : isWorst ? badCol : glacierCol;
+            ctx.fill();
+            ctx.lineWidth = isSel ? 2.5 : 1.5;
+            ctx.strokeStyle = cssVar("--surface");
+            ctx.stroke();
+          }
+        });
+
+        // X-axis date labels (evenly spaced without overlap)
+        ctx.fillStyle = mutedCol;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        var maxTicks = Math.max(4, Math.floor(plotW / 76));
+        var labelStep = Math.max(1, Math.ceil(series.length / maxTicks));
+        var lastLblX = -Infinity;
+        var endLblX = xOf(series.length - 1);
+        series.forEach(function (p, i) {
+          var isEnd = (i === series.length - 1);
+          if (i % labelStep === 0 || isEnd) {
+            var px = xOf(i);
+            if (!isEnd && (px - lastLblX < 54 || endLblX - px < 54)) return;
+            ctx.fillText(p.label, px, pad.top + plotH + 10);
+            lastLblX = px;
+          }
+        });
+      }
+
+      // Canvas Hover & Click
+      var fCanvas = document.getElementById("forecast-canvas");
+      var fTip = document.getElementById("chart-tooltip");
+      fCanvas.addEventListener("mousemove", function (ev) {
+        if (!chartPointsMeta.length) return;
+        var r = fCanvas.getBoundingClientRect();
+        var mx = ev.clientX - r.left;
+        var nearest = null, bestDist = Infinity;
+        chartPointsMeta.forEach(function (pt) {
+          var d = Math.abs(pt.x - mx);
+          if (d < bestDist) { bestDist = d; nearest = pt; }
+        });
+        if (nearest && bestDist < 32) {
+          var p = nearest.item;
+          var txt = '<strong>' + p.ds + (p.isHist ? " (Observed)" : " (Forecast)") + '</strong><br/>' +
+            '<span class="tabular">' + fmtNum(p.val) + ' vehicles</span>';
+          if (!p.isHist && p.raw) {
+            txt += '<br/><span class="tabular" style="color:var(--muted);">80% PI: ' + fmtNum(p.pi80L) + '–' + fmtNum(p.pi80H) + '</span>' +
+                   '<br/>' + (p.raw.weather_label || "") + ' · ' + fmtTemp(p.raw.temp_max_c);
+            if (p.raw.event_label) txt += '<br/><span style="color:var(--accent);">' + p.raw.event_label + '</span>';
+          }
+          fTip.innerHTML = txt;
+          var leftPos = Math.min(r.width - 210, Math.max(12, nearest.x + 12));
+          var topPos = Math.max(8, nearest.y - 54);
+          fTip.style.left = leftPos + "px";
+          fTip.style.top = topPos + "px";
+          fTip.style.opacity = "1";
+        } else {
+          fTip.style.opacity = "0";
+        }
+      });
+      fCanvas.addEventListener("mouseleave", function () { fTip.style.opacity = "0"; });
+      fCanvas.addEventListener("click", function (ev) {
+        if (!chartPointsMeta.length) return;
+        var r = fCanvas.getBoundingClientRect();
+        var mx = ev.clientX - r.left;
+        var nearest = null, bestDist = Infinity;
+        chartPointsMeta.forEach(function (pt) {
+          if (pt.item.isHist || pt.item.raw.is_bridge_gap) return;
+          var d = Math.abs(pt.x - mx);
+          if (d < bestDist) { bestDist = d; nearest = pt; }
+        });
+        if (nearest && bestDist < 28) {
+          state.selectedDs = nearest.item.ds;
+          renderStrip();
+          renderInspector();
+          drawForecastChart();
+        }
+      });
+
+      // View 2: Annual 365-Day Calendar Heatmap & Dow/Monthly Charts
+      function buildAnnualSection() {
+        var annual = PAYLOAD.annual_planner || {};
+        var prof = annual.daily_profile_365 || [];
+        var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        var byMd = {};
+        var vMin = Infinity, vMax = -Infinity;
+        prof.forEach(function (r) {
+          byMd[r.month + "-" + r.day] = r;
+          if (r.avg_vehicles < vMin) vMin = r.avg_vehicles;
+          if (r.avg_vehicles > vMax) vMax = r.avg_vehicles;
+        });
+
+        function heatColor(v) {
+          var t = Math.max(0, Math.min(1, (v - vMin) / Math.max(1, vMax - vMin)));
+          if (t < 0.35) {
+            return "hsl(" + Math.round(145 - t * 40) + ", 55%, " + Math.round(78 - t * 35) + "%)";
+          }
+          if (t < 0.7) {
+            return "hsl(" + Math.round(52 - (t - 0.35) * 60) + ", 80%, " + Math.round(62 - (t - 0.35) * 20) + "%)";
+          }
+          return "hsl(" + Math.round(24 - (t - 0.7) * 55) + ", 78%, " + Math.round(54 - (t - 0.7) * 24) + "%)";
+        }
+
+        var rowsHtml = "";
+        for (var m = 1; m <= 12; m++) {
+          rowsHtml += '<div class="hm-row"><span class="hm-month">' + months[m - 1] + '</span>';
+          for (var d = 1; d <= 31; d++) {
+            var item = byMd[m + "-" + d];
+            if (!item) {
+              rowsHtml += '<span class="hm-cell hm-empty"></span>';
+            } else {
+              rowsHtml += '<button type="button" class="hm-cell" style="background:' + heatColor(item.avg_vehicles) +
+                ';" data-md="' + m + '-' + d + '" aria-label="' + item.date_label + ' average ' + fmtNum(item.avg_vehicles) + ' vehicles"></button>';
+            }
+          }
+          rowsHtml += '</div>';
+        }
+        var hmEl = document.getElementById("annual-heatmap");
+        hmEl.innerHTML = rowsHtml;
+        hmEl.querySelectorAll(".hm-cell[data-md]").forEach(function (cell) {
+          var show = function () {
+            var item = byMd[cell.getAttribute("data-md")];
+            if (!item) return;
+            document.getElementById("hm-readout").innerHTML =
+              '<strong>' + item.date_label + ' (' + item.season_tag + ')</strong>' +
+              '<span class="tabular">3-Yr Avg: <strong>' + fmtNum(item.avg_vehicles) + ' veh/day</strong> (IQR ' +
+              fmtNum(item.p25_vehicles) + '–' + fmtNum(item.p75_vehicles) + ') · Normal High/Low: ' +
+              fmtTemp(item.temp_max_c) + ' / ' + fmtTemp(item.temp_min_c) + '</span>';
+          };
+          cell.addEventListener("mouseenter", show);
+          cell.addEventListener("click", show);
+        });
+
+        var ins = PAYLOAD.insights || {};
+        document.getElementById("insight-weekly-text").textContent = ins.weekly_insight || "";
+        document.getElementById("insight-seasonal-text").textContent = ins.seasonal_insight || "";
+      }
+
+      function drawBarChart(canvasId, labels, values, colors, suffix) {
+        var canvas = document.getElementById(canvasId);
+        if (!canvas || canvas.offsetParent === null || !values.length) return;
+        var rect = canvas.parentElement.getBoundingClientRect();
+        var dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.max(260, Math.floor(rect.width * dpr));
+        canvas.height = Math.max(200, Math.floor(rect.height * dpr));
+        var ctx = canvas.getContext("2d");
+        ctx.scale(dpr, dpr);
+        var W = rect.width, H = rect.height;
+        var pad = { top: 24, right: 14, bottom: 32, left: 48 };
+        var pW = W - pad.left - pad.right, pH = H - pad.top - pad.bottom;
+        var maxV = Math.max.apply(null, values) * 1.12;
+        var borderCol = cssVar("--border"), mutedCol = cssVar("--muted"), inkCol = cssVar("--ink");
+
+        ctx.font = "600 11px " + cssVar("--font-sans");
+        for (var g = 0; g <= 3; g++) {
+          var v = (g / 3) * maxV;
+          var y = pad.top + pH - (v / maxV) * pH;
+          ctx.strokeStyle = borderCol; ctx.setLineDash([3, 3]);
+          ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = mutedCol; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+          ctx.fillText((v / 1000).toFixed(0) + "k", pad.left - 6, y);
+        }
+
+        var slot = pW / labels.length;
+        var bw = Math.min(34, slot * 0.62);
+        labels.forEach(function (lbl, i) {
+          var bh = (values[i] / maxV) * pH;
+          var bx = pad.left + i * slot + (slot - bw) / 2;
+          var by = pad.top + pH - bh;
+          ctx.fillStyle = colors[i];
+          ctx.beginPath();
+          ctx.roundRect ? ctx.roundRect(bx, by, bw, bh, [5, 5, 0, 0]) : ctx.rect(bx, by, bw, bh);
+          ctx.fill();
+          ctx.fillStyle = inkCol; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+          ctx.fillText((values[i] / 1000).toFixed(1) + suffix, bx + bw / 2, by - 4);
+          ctx.fillStyle = mutedCol; ctx.textBaseline = "top";
+          ctx.fillText(lbl, bx + bw / 2, pad.top + pH + 8);
+        });
+      }
+
+      function drawAnnualCharts() {
+        var annual = PAYLOAD.annual_planner || {};
+        var dow = annual.dow_profile || [];
+        var mon = annual.monthly_typical || [];
+        drawBarChart(
+          "dow-canvas",
+          dow.map(function (d) { return d.short; }),
+          dow.map(function (d) { return d.avg_vehicles; }),
+          dow.map(function (d) { return d.is_weekend ? cssVar("--warn") : cssVar("--accent"); }),
+          "k"
+        );
+        drawBarChart(
+          "monthly-canvas",
+          mon.map(function (m) { return m.name; }),
+          mon.map(function (m) { return m.avg_vehicles; }),
+          mon.map(function (m) { return m.avg_vehicles > 22000 ? cssVar("--warn") : cssVar("--glacier"); }),
+          "k"
+        );
+      }
+
+      // View 3: Science & Live Sources
+      function buildScienceSection() {
+        var cv = PAYLOAD.cv_benchmark || {};
+        document.getElementById("cv-subtitle").textContent =
+          (cv.n_folds || 12) + " expanding-window folds × " + (cv.horizon_days || 16) + "-day horizons (" + (cv.n_oof_days || 192) + " unseen days across all 4 Banff seasons)";
+        document.getElementById("cv-cov-badge").textContent =
+          "Conformal Cov: 80% → " + (cv.empirical_cov80_pct || 80) + "% · 95% → " + (cv.empirical_cov95_pct || 95) + "%";
+
+        var rows = (cv.summary_metrics || []).map(function (m) {
+          var isEns = m.model === "Ensemble_Weighted";
+          return '<tr class="' + (isEns ? "is-ensemble" : "") + '">' +
+            '<td>' + m.model + '</td>' +
+            '<td class="tabular">' + fmtNum(m.MAE) + '</td>' +
+            '<td class="tabular">' + fmtNum(m.RMSE) + '</td>' +
+            '<td class="tabular">' + Number(m.MAPE).toFixed(2) + '%</td>' +
+            '<td class="tabular">' + Number(m.sMAPE).toFixed(2) + '%</td>' +
+            '<td class="tabular">' + Number(m.MASE).toFixed(3) + '</td>' +
+            '<td class="tabular">' + (m.Bias_pct >= 0 ? "+" : "") + Number(m.Bias_pct).toFixed(2) + '%</td>' +
+          '</tr>';
+        }).join("");
+        document.getElementById("cv-table").innerHTML =
+          '<thead><tr><th>Model Family</th><th>MAE</th><th>RMSE</th><th>MAPE</th><th>sMAPE</th><th>MASE</th><th>Bias</th></tr></thead><tbody>' + rows + '</tbody>';
+
+        var weights = cv.ensemble_weights || {};
+        var wHtml = Object.keys(weights).sort(function (a, b) { return weights[b] - weights[a]; }).map(function (m) {
+          var pct = Math.round(weights[m] * 1000) / 10;
+          return '<div class="pct-bar-wrap">' +
+            '<div class="pct-bar-labels"><span>' + m + '</span><strong class="tabular">' + pct.toFixed(1) + '%</strong></div>' +
+            '<div class="pct-track"><div class="pct-fill" style="width:' + Math.max(2, pct) + '%;background:var(--accent);"></div></div>' +
+          '</div>';
+        }).join("");
+        document.getElementById("weights-bars").innerHTML = wHtml;
+
+        var f = PAYLOAD.data_freshness || {};
+        var mac = f.latest_macro_snapshot || {};
+        var cards = [
+          {
+            title: "Town of Banff Traffic Counters",
+            meta: "Tableau Public (.twb → .hyper) · " + fmtNum(f.traffic_days) + " complete days (" + f.traffic_start_date + " to " + f.traffic_last_observed + "). Tracks West, East &amp; Mountain Ave (>=23h/day &amp; 4x guards)."
+          },
+          {
+            title: "Banff Weather &amp; 16-Day NWP",
+            meta: "ECCC BANFF CS (3050519) + Open-Meteo ERA5 bias-calibrated archive + 16-day forecast through " + f.weather_forecast_through + "."
+          },
+          {
+            title: "Bank of Canada FX (USD/CAD)",
+            meta: "Daily Valet FXUSDCAD (legacy pre-2017 IEXE0101 spliced) observed through " + f.fx_last_observed + (f.fx_latest_usdcad ? " (latest: " + f.fx_latest_usdcad + ")" : "") + "."
+          },
+          {
+            title: "Statistics Canada Macro &amp; Visitors",
+            meta: "Monthly CPI Gasoline, Unemployment (" + (mac.AB_LFS_UnempRate_SA || "—") + "%), Food Services &amp; Int'l Travellers through " + f.statcan_macro_through + "."
+          },
+          {
+            title: "Alberta Economic Dashboard",
+            meta: "Hwy 1 Banff Park Gates (" + f.alberta_hwy1_through + ") &amp; Banff National Park Attendance (" + f.alberta_park_attendance_through + ")."
+          },
+          {
+            title: "Scope Governance",
+            meta: "Alberta statutory &amp; bridge calendar integrated natively. Municipal Zero Waste series are strictly excluded from all models &amp; features."
+          }
+        ];
+        document.getElementById("sources-grid").innerHTML = cards.map(function (c) {
+          return '<div class="source-card"><h4 class="source-title">' + c.title + '</h4><p class="source-meta">' + c.meta + '</p></div>';
+        }).join("");
+      }
+
+      function drawChartsForActiveView() {
+        if (state.view === "planner") drawForecastChart();
+        if (state.view === "annual") drawAnnualCharts();
+      }
+
+      buildAnnualSection();
+      buildScienceSection();
+      renderPlanner();
+      if (qView || hashView) setActiveView(qView || hashView);
+
+      window.addEventListener("resize", drawChartsForActiveView);
+    })();
+  </script>
+</body>
+</html>

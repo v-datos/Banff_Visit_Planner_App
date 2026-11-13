@@ -1,13 +1,17 @@
-name: Update Traffic Data
+name: Update Traffic Data & Forecast
 
 on:
   schedule:
-    # Runs twice a month on fixed dates: the 1st and the 16th
-    - cron: '0 6 1,16 * *'
-  workflow_dispatch: # Allows manual trigger
+    # Daily run at 11:00 UTC (04:00 AM MST / 05:00 AM MDT) so >= 15 future days stay live
+    - cron: "0 11 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: "daily-forecast-update"
+  cancel-in-progress: true
 
 jobs:
   update-data:
@@ -15,41 +19,33 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
 
-      - name: Install dependencies
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install pipeline and test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-update.txt
+          pip install -e ".[app,dev]"
 
-      - name: Download pretrained model bundle
-        env:
-          GH_TOKEN: ${{ github.token }}
-          MODEL_RELEASE_TAG: modelos-exo-v1
-          MODEL_ASSET_NAME: modelos_exo.zip
-        run: |
-          rm -rf modelos_exo modelos_exo.zip
-          gh release download "$MODEL_RELEASE_TAG" --pattern "$MODEL_ASSET_NAME" --repo "$GITHUB_REPOSITORY"
-          unzip -q "$MODEL_ASSET_NAME"
-          test -d modelos_exo
+      - name: Refresh live data, run expanding CV, conformal calibration & rebuild site
+        run: banff-planner --refresh-web
 
-      - name: Run data extraction script
-        run: python extract_data.py
+      - name: Verify mathematical, conformal & UI invariants before committing
+        run: pytest -v
 
-      - name: Run prediction updates
-        run: python update_predictions.py
-
-      - name: Commit and push changes
+      - name: Commit and push updated data, forecasts, and static site
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add "TW Traffic _data.csv" predictions.csv
-          # Only commit if there are changes
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: auto-update Banff traffic data and predictions" && git push)
+          git add "TW Traffic _data.csv" predictions.csv data/ outputs/ site/
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: daily Banff traffic, exogenous data & conformal forecast update" && git push)

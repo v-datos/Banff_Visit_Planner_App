@@ -53,3 +53,5 @@ Thumbs.db
 # *.xlsx
 lightning_logs/
 modelos_exo/
+.pytest_cache/
+
