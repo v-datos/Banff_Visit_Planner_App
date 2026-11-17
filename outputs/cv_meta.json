@@ -1,16 +1,16 @@
 {
   "model_weights": {
-    "Hybrid_Ridge_CatBoost": 0.5447731265173963,
-    "MLForecast_LGBM": 0.25692214596408935,
-    "Ridge_AR_Exo": 0.1528173427206614,
-    "LogMSTL_ETS": 0.045487384797853025
+    "Hybrid_Ridge_CatBoost": 0.5119629115241935,
+    "MLForecast_LGBM": 0.2935117759266321,
+    "Ridge_AR_Exo": 0.15409941167801,
+    "LogMSTL_ETS": 0.04042590087116437
   },
   "cv_info": {
     "n_folds": 12,
     "n_oof_days": 192,
     "horizon_days": 16,
-    "empirical_cov80_pct": 80.2,
-    "empirical_cov95_pct": 96.4,
-    "runtime_sec": 14.67
+    "empirical_cov80_pct": 79.2,
+    "empirical_cov95_pct": 95.8,
+    "runtime_sec": 19.59
   }
 }
